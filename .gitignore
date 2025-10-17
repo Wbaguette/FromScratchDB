@@ -1,0 +1,9 @@
+# CMake generated files
+build/
+CMakeFiles/
+cmake_install.cmake
+CMakeCache.txt
+Makefile
+
+# Executable
+database
