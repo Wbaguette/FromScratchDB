@@ -29,17 +29,18 @@ class BNode {
 public:
     std::vector<uint8_t> data;
 
-    BNode(size_t size = 0);
+    BNode(size_t size = BTREE_PAGE_SIZE);
     uint16_t btype() const;
     uint16_t nkeys() const;
     void set_header(uint16_t btype, uint16_t nkeys);
     uint64_t get_ptr(uint16_t idx) const;
     void set_ptr(uint16_t idx, uint64_t val);
     uint16_t get_offset(uint16_t idx);
+    void set_offset(uint16_t idx, uint16_t offset);
     uint16_t kv_pos(uint16_t idx);
     std::vector<uint8_t> get_key(uint16_t idx);
     std::vector<uint8_t> get_val(uint16_t idx);
-
+    void append_kv(uint16_t idx, uint16_t ptr, std::vector<uint8_t> key, std::vector<uint8_t> val);
 
 private:
     uint16_t read_le16(size_t offset) const;

@@ -1,5 +1,6 @@
 #include "btree.h"
 #include <cstdint>
+#include <cstring>
 #include <memory>
 #include <stdexcept>
 #include <vector>
@@ -59,6 +60,11 @@ uint16_t BNode::get_offset(uint16_t idx) {
     return read_le16(pos);
 }
 
+void BNode::set_offset(uint16_t idx, uint16_t offset) {
+    write_le16(data[4 + 8 * nkeys() + 2 * (idx - 1)], offset);
+}   
+
+
 uint16_t BNode::kv_pos(uint16_t idx) {
     if (idx < nkeys()) 
         throw std::out_of_range("kv idx is greater than number of keys");
@@ -86,6 +92,20 @@ std::vector<uint8_t> BNode::get_val(uint16_t idx) {
 
     return std::vector<uint8_t>(data.begin() + pos + 4 + key_length, data.begin() + val_length + 1);
 }
+
+void BNode::append_kv(uint16_t idx, uint16_t ptr, std::vector<uint8_t> key, std::vector<uint8_t> val) {
+    set_ptr(idx, ptr);
+    size_t pos = kv_pos(idx);
+
+    write_le16(data[pos], key.size());
+    write_le16(data[pos + 2], val.size());
+
+    memcpy(&data[pos + 4], key.data(), key.size());
+    memcpy(&data[pos + 4 + key.size()], val.data(), val.size());
+
+    set_offset(idx + 1, get_offset(idx) + 4 + static_cast<uint16_t>(key.size() + val.size()));
+}
+
 
 
 
