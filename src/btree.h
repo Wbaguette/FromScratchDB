@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <memory>
+#include <ostream>
 #include <vector>
 
 constexpr int BNODE_NODE = 1;
@@ -40,7 +41,8 @@ public:
     uint16_t kv_pos(uint16_t idx);
     std::vector<uint8_t> get_key(uint16_t idx);
     std::vector<uint8_t> get_val(uint16_t idx);
-    void append_kv(uint16_t idx, uint16_t ptr, std::vector<uint8_t> key, std::vector<uint8_t> val);
+    void append_kv(uint16_t idx, uint16_t ptr, const std::vector<uint8_t>& key, const std::vector<uint8_t>& val);
+    friend std::ostream& operator<<(std::ostream& os, const BNode& b_node);
 
 private:
     uint16_t read_le16(size_t offset) const;

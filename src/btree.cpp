@@ -3,7 +3,9 @@
 #include <cstring>
 #include <memory>
 #include <stdexcept>
+#include <string_view>
 #include <vector>
+#include <iostream>
 
 Node::Node() {
     static_assert(4 + 8 + 2 + 4 + BTREE_MAX_KEY_SIZE + BTREE_MAX_VAL_SIZE <= BTREE_PAGE_SIZE, "Node size is greater than max btree page size");
@@ -18,6 +20,27 @@ std::unique_ptr<Node> Node::decode(std::vector<uint8_t> page) {}
 
 
 BNode::BNode(size_t size): data(size) {} 
+
+std::ostream& operator<<(std::ostream& os, const BNode& b_node) {
+    std::string_view bnode_type;
+    if (b_node.btype() == 1) {
+        bnode_type = "node (1)";
+    } else {
+        bnode_type = "leaf (2)";
+    }
+
+    os << "btype=" << bnode_type << std::endl
+       << "nkeys=" << b_node.nkeys() << std::endl
+       << "data_vec_size=" << b_node.data.size() << std::endl
+       << "data_vec_capacity=" << b_node.data.capacity() << std::endl;
+    
+    for (uint8_t c : b_node.data) {
+        os << static_cast<char>(c);
+    }
+
+    return os;
+}
+
 
 uint16_t BNode::btype() const {
     if (data.size() < 2)
@@ -37,7 +60,7 @@ void BNode::set_header(uint16_t btype, uint16_t nkeys) {
 }
 
 uint64_t BNode::get_ptr(uint16_t idx) const {
-    if (idx < nkeys()) 
+    if (idx >= nkeys()) 
         throw std::out_of_range("child pointer idx is greater than number of keys");
 
     size_t pos = 4 + 8 * idx; // Position of child pointer is 4 bytes (header) + 8 * position (each child pointer is 8 bytes on 64bit arch)
@@ -45,7 +68,7 @@ uint64_t BNode::get_ptr(uint16_t idx) const {
 }
 
 void BNode::set_ptr(uint16_t idx, uint64_t val) {
-    if (idx < nkeys()) 
+    if (idx >= nkeys()) 
         throw std::out_of_range("child pointer idx is greater than number of keys");
 
     size_t pos = 4 + 8 * idx; // Position of child pointer is 4 bytes (header) + 8 * position (each child pointer is 8 bytes on 64bit arch)
@@ -61,19 +84,22 @@ uint16_t BNode::get_offset(uint16_t idx) {
 }
 
 void BNode::set_offset(uint16_t idx, uint16_t offset) {
+    if (idx > nkeys())
+        throw std::out_of_range("offset pos idx is greater than number of keys");
+
     write_le16(data[4 + 8 * nkeys() + 2 * (idx - 1)], offset);
 }   
 
 
 uint16_t BNode::kv_pos(uint16_t idx) {
-    if (idx < nkeys()) 
+    if (idx > nkeys()) 
         throw std::out_of_range("kv idx is greater than number of keys");
 
     return 4 + 8 * nkeys() + 2 * nkeys() + get_offset(idx);
 }
 
 std::vector<uint8_t> BNode::get_key(uint16_t idx) {
-    if (idx < nkeys()) 
+    if (idx >= nkeys()) 
         throw std::out_of_range("key index is greater than number of keys");
 
     size_t pos = kv_pos(idx);
@@ -83,7 +109,7 @@ std::vector<uint8_t> BNode::get_key(uint16_t idx) {
 }
 
 std::vector<uint8_t> BNode::get_val(uint16_t idx) {
-    if (idx < nkeys()) 
+    if (idx >= nkeys()) 
         throw std::out_of_range("val index is greater than number of keys");
 
     size_t pos = kv_pos(idx);
@@ -93,7 +119,7 @@ std::vector<uint8_t> BNode::get_val(uint16_t idx) {
     return std::vector<uint8_t>(data.begin() + pos + 4 + key_length, data.begin() + val_length + 1);
 }
 
-void BNode::append_kv(uint16_t idx, uint16_t ptr, std::vector<uint8_t> key, std::vector<uint8_t> val) {
+void BNode::append_kv(uint16_t idx, uint16_t ptr, const std::vector<uint8_t>& key, const std::vector<uint8_t>& val) {
     set_ptr(idx, ptr);
     size_t pos = kv_pos(idx);
 
