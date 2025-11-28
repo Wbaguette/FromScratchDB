@@ -22,22 +22,26 @@ std::unique_ptr<Node> Node::decode(std::vector<uint8_t> page) {}
 BNode::BNode(size_t size): data(size) {} 
 
 std::ostream& operator<<(std::ostream& os, const BNode& b_node) {
+    os << "BNode { " << std::endl; 
     std::string_view bnode_type;
     if (b_node.btype() == 1) {
-        bnode_type = "node (1)";
+        bnode_type = "node(1)";
     } else {
-        bnode_type = "leaf (2)";
+        bnode_type = "leaf(2)";
     }
 
-    os << "btype=" << bnode_type << std::endl
-       << "nkeys=" << b_node.nkeys() << std::endl
-       << "data_vec_size=" << b_node.data.size() << std::endl
-       << "data_vec_capacity=" << b_node.data.capacity() << std::endl;
+    os << " btype=" << bnode_type << std::endl
+       << " nkeys=" << b_node.nkeys() << std::endl
+       << " data_vec_size=" << b_node.data.size() << std::endl
+       << " data_vec_capacity=" << b_node.data.capacity() << std::endl;
     
+    os << " data=[ ";
     for (uint8_t c : b_node.data) {
         os << static_cast<char>(c);
     }
-
+    os << "]" << std::endl;
+    os << "}" << std::endl;
+    
     return os;
 }
 
@@ -98,6 +102,7 @@ uint16_t BNode::kv_pos(uint16_t idx) {
     return 4 + 8 * nkeys() + 2 * nkeys() + get_offset(idx);
 }
 
+// TODO: Reverify all data accesses, "first" and "last" are wrong
 std::vector<uint8_t> BNode::get_key(uint16_t idx) {
     if (idx >= nkeys()) 
         throw std::out_of_range("key index is greater than number of keys");
