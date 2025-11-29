@@ -11,7 +11,7 @@ constexpr int BTREE_PAGE_SIZE = 4096;
 constexpr int BTREE_MAX_KEY_SIZE = 1000;
 constexpr int BTREE_MAX_VAL_SIZE = 3000;
 
-class Node {
+struct Node {
 public:
     std::vector<std::vector<uint8_t>> keys;
     std::vector<std::vector<uint8_t>> vals;
@@ -22,18 +22,19 @@ public:
     std::vector<uint8_t> encode();
     static std::unique_ptr<Node> decode(std::vector<uint8_t> page);
 
-private:
-    
 };
 
-class BNode {
+struct BNode {
 public:
     std::vector<uint8_t> data;
 
     BNode(size_t size = BTREE_PAGE_SIZE);
     uint16_t btype() const;
     uint16_t nkeys() const;
-    void set_header(uint16_t btype, uint16_t nkeys);
+    inline void set_header(uint16_t btype, uint16_t nkeys) {
+        write_le16(0, btype);
+        write_le16(2, nkeys);
+    }
     uint64_t get_ptr(uint16_t idx) const;
     void set_ptr(uint16_t idx, uint64_t val);
     uint16_t get_offset(uint16_t idx);
@@ -45,11 +46,29 @@ public:
     friend std::ostream& operator<<(std::ostream& os, const BNode& b_node);
 
 private:
-    uint16_t read_le16(size_t offset) const;
-    uint64_t read_le64(size_t offset) const;
+    inline uint16_t read_le16(size_t offset) const {
+        uint16_t v;
+        std::memcpy(&v, &data[offset], sizeof(v));
+        return v;
+    }
 
-    void write_le16(size_t offset, uint16_t val);
-    void write_le64(size_t offset, uint64_t val);
+    inline uint64_t read_le64(size_t offset) const {
+        uint64_t v;
+        std::memcpy(&v, &data[offset], sizeof(v));
+        return v;
+    }
+
+    inline void write_le16(size_t offset, uint16_t val) {
+        if (data.size() < offset + sizeof(val))
+            data.resize(offset + sizeof(val));
+        std::memcpy(&data[offset], &val, sizeof(val));
+    }
+
+    inline void write_le64(size_t offset, uint64_t val) {
+        if (data.size() < offset + sizeof(val))
+            data.resize(offset + sizeof(val));
+        std::memcpy(&data[offset], &val, sizeof(val));
+    }
 
 };
 

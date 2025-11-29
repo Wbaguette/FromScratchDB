@@ -58,11 +58,6 @@ uint16_t BNode::nkeys() const {
     return read_le16(2);    
 }
 
-void BNode::set_header(uint16_t btype, uint16_t nkeys) {
-    write_le16(0, btype);
-    write_le16(2, nkeys);
-}
-
 uint64_t BNode::get_ptr(uint16_t idx) const {
     if (idx >= nkeys()) 
         throw std::out_of_range("child pointer idx is greater than number of keys");
@@ -97,7 +92,7 @@ void BNode::set_offset(uint16_t idx, uint16_t offset) {
 
 
 uint16_t BNode::kv_pos(uint16_t idx) {
-    if (idx > nkeys()) 
+    if (idx >= nkeys()) 
         throw std::out_of_range("kv idx is greater than number of keys");
 
     return 4 + 8 * nkeys() + 2 * nkeys() + get_offset(idx);
@@ -108,7 +103,8 @@ std::vector<uint8_t> BNode::get_key(uint16_t idx) {
         throw std::out_of_range("key index is greater than number of keys");
 
     size_t pos = kv_pos(idx);
-    uint16_t key_length = read_le16(data[pos]);
+    uint16_t key_length = read_le16(pos);
+
 
     auto begin = data.begin() + pos + 4;
     auto last = begin + key_length;
@@ -121,8 +117,8 @@ std::vector<uint8_t> BNode::get_val(uint16_t idx) {
         throw std::out_of_range("val index is greater than number of keys");
 
     size_t pos = kv_pos(idx);
-    uint16_t key_length = read_le16(data[pos]);
-    uint16_t val_length = read_le16(data[pos + 2]);
+    uint16_t key_length = read_le16(pos);
+    uint16_t val_length = read_le16(pos + 2);
 
     auto begin = data.begin() + pos + 4 + key_length;
     auto last   = begin + val_length;
@@ -134,8 +130,6 @@ void BNode::append_kv(uint16_t idx, uint64_t ptr, const std::vector<uint8_t>& ke
     set_ptr(idx, ptr);
     size_t pos = kv_pos(idx);
     
-    std::cout << "pos=" << pos << std::endl;
-
     write_le16(pos, static_cast<uint16_t>(key.size()));
     write_le16(pos + 2, static_cast<uint16_t>(val.size()));
 
@@ -143,33 +137,4 @@ void BNode::append_kv(uint16_t idx, uint64_t ptr, const std::vector<uint8_t>& ke
     memcpy(&data[pos + 4 + key.size()], val.data(), val.size());
 
     set_offset(idx + 1, get_offset(idx) + 4 + static_cast<uint16_t>(key.size() + val.size()));
-}
-
-
-
-
-uint16_t BNode::read_le16(size_t offset) const {
-    uint16_t v;
-    std::memcpy(&v, &data[offset], sizeof(v));
-    return v;
-}
-
-uint64_t BNode::read_le64(size_t offset) const {
-    uint64_t v;
-    std::memcpy(&v, &data[offset], sizeof(v));
-    return v;
-}
-
-void BNode::write_le16(size_t offset, uint16_t val) {
-    if (data.size() < offset + sizeof(val))
-        data.resize(offset + sizeof(val));
-
-    std::memcpy(&data[offset], &val, sizeof(val));
-}
-
-void BNode::write_le64(size_t offset, uint64_t val) {
-    if (data.size() < offset + sizeof(val))
-        data.resize(offset + sizeof(val));
-
-    std::memcpy(&data[offset], &val, sizeof(val));
 }
