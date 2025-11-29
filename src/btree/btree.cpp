@@ -68,7 +68,7 @@ uint64_t BNode::get_ptr(uint16_t idx) const {
         throw std::out_of_range("child pointer idx is greater than number of keys");
 
     size_t pos = 4 + 8 * idx; // Position of child pointer is 4 bytes (header) + 8 * position (each child pointer is 8 bytes on 64bit arch)
-    return read_le16(pos);
+    return read_le64(pos);
 }
 
 void BNode::set_ptr(uint16_t idx, uint64_t val) {
@@ -76,7 +76,7 @@ void BNode::set_ptr(uint16_t idx, uint64_t val) {
         throw std::out_of_range("child pointer idx is greater than number of keys");
 
     size_t pos = 4 + 8 * idx; // Position of child pointer is 4 bytes (header) + 8 * position (each child pointer is 8 bytes on 64bit arch)
-    return write_le16(pos, val);
+    write_le64(pos, val);
 }
 
 uint16_t BNode::get_offset(uint16_t idx) {
@@ -108,9 +108,15 @@ std::vector<uint8_t> BNode::get_key(uint16_t idx) {
         throw std::out_of_range("key index is greater than number of keys");
 
     size_t pos = kv_pos(idx);
-    uint16_t key_length = read_le16(data[pos]);
+    // uint16_t key_length = read_le16(data[pos]);
     
-    return std::vector<uint8_t>(data.begin() + pos + 4, data.begin() + key_length + 1);
+    // return std::vector<uint8_t>(data.begin() + pos + 4, data.begin() + key_length + 1);
+    uint16_t key_length = read_le16(data[pos]);
+
+    auto begin = data.begin() + pos + 4;
+    auto last = begin + key_length;
+
+    return std::vector<uint8_t>(begin, last);
 }
 
 std::vector<uint8_t> BNode::get_val(uint16_t idx) {
@@ -121,15 +127,22 @@ std::vector<uint8_t> BNode::get_val(uint16_t idx) {
     uint16_t key_length = read_le16(data[pos]);
     uint16_t val_length = read_le16(data[pos + 2]);
 
-    return std::vector<uint8_t>(data.begin() + pos + 4 + key_length, data.begin() + val_length + 1);
+    auto begin = data.begin() + pos + 4 + key_length;
+    auto last   = begin + val_length;
+
+    return std::vector<uint8_t>(begin, last);
 }
 
-void BNode::append_kv(uint16_t idx, uint16_t ptr, const std::vector<uint8_t>& key, const std::vector<uint8_t>& val) {
+void BNode::append_kv(uint16_t idx, uint64_t ptr, const std::vector<uint8_t>& key, const std::vector<uint8_t>& val) {
     set_ptr(idx, ptr);
     size_t pos = kv_pos(idx);
+    
+    std::cout << "pos=" << pos << std::endl;
 
-    write_le16(data[pos], key.size());
-    write_le16(data[pos + 2], val.size());
+    write_le16(pos, static_cast<uint16_t>(key.size()));
+    write_le16(pos + 2, static_cast<uint16_t>(val.size()));
+    // write_le16(data[pos], key.size());
+    // write_le16(data[pos + 2], val.size());
 
     memcpy(&data[pos + 4], key.data(), key.size());
     memcpy(&data[pos + 4 + key.size()], val.data(), val.size());
@@ -141,13 +154,31 @@ void BNode::append_kv(uint16_t idx, uint16_t ptr, const std::vector<uint8_t>& ke
 
 
 uint16_t BNode::read_le16(size_t offset) const {
-    return static_cast<uint16_t>(data[offset]) | (static_cast<uint16_t>(data[offset + 1]) << 8);
+    uint16_t v;
+    std::memcpy(&v, &data[offset], sizeof(v));
+    return v;
+    // return static_cast<uint16_t>(data[offset]) | (static_cast<uint16_t>(data[offset + 1]) << 8);
+}
+
+uint64_t BNode::read_le64(size_t offset) const {
+    uint64_t v;
+    std::memcpy(&v, &data[offset], sizeof(v));
+    return v;
+    // return static_cast<uint64_t>(data[offset]) | (static_cast<uint64_t>(data[offset + 1]) << 8);
 }
 
 void BNode::write_le16(size_t offset, uint16_t val) {
-    if (data.size() < offset + 2)
-        data.resize(offset + 2);
+    if (data.size() < offset + sizeof(val))
+        data.resize(offset + sizeof(val));
 
-    data[offset] = static_cast<uint8_t>(val & 0xFF);
-    data[offset + 1] = static_cast<uint8_t>((val >> 8) & 0xFF);
+    std::memcpy(&data[offset], &val, sizeof(val));
+    // data[offset] = static_cast<uint8_t>(val & 0xFF);
+    // data[offset + 1] = static_cast<uint8_t>((val >> 8) & 0xFF);
+}
+
+void BNode::write_le64(size_t offset, uint64_t val) {
+    if (data.size() < offset + sizeof(val))
+        data.resize(offset + sizeof(val));
+
+    std::memcpy(&data[offset], &val, sizeof(val));
 }

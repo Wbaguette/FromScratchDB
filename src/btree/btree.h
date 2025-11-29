@@ -41,11 +41,15 @@ public:
     uint16_t kv_pos(uint16_t idx);
     std::vector<uint8_t> get_key(uint16_t idx);
     std::vector<uint8_t> get_val(uint16_t idx);
-    void append_kv(uint16_t idx, uint16_t ptr, const std::vector<uint8_t>& key, const std::vector<uint8_t>& val);
+    void append_kv(uint16_t idx, uint64_t ptr, const std::vector<uint8_t>& key, const std::vector<uint8_t>& val);
     friend std::ostream& operator<<(std::ostream& os, const BNode& b_node);
 
 private:
     uint16_t read_le16(size_t offset) const;
+    uint64_t read_le64(size_t offset) const;
+
     void write_le16(size_t offset, uint16_t val);
+    void write_le64(size_t offset, uint64_t val);
+
 };
 
