@@ -91,7 +91,8 @@ void BNode::set_offset(uint16_t idx, uint16_t offset) {
     if (idx > nkeys())
         throw std::out_of_range("offset pos idx is greater than number of keys");
 
-    write_le16(data[4 + 8 * nkeys() + 2 * (idx - 1)], offset);
+    size_t pos = 4 + 8 * nkeys() + 2 * (idx - 1);
+    write_le16(pos, offset);
 }   
 
 
@@ -102,15 +103,11 @@ uint16_t BNode::kv_pos(uint16_t idx) {
     return 4 + 8 * nkeys() + 2 * nkeys() + get_offset(idx);
 }
 
-// TODO: Reverify all data accesses, "first" and "last" are wrong
 std::vector<uint8_t> BNode::get_key(uint16_t idx) {
     if (idx >= nkeys()) 
         throw std::out_of_range("key index is greater than number of keys");
 
     size_t pos = kv_pos(idx);
-    // uint16_t key_length = read_le16(data[pos]);
-    
-    // return std::vector<uint8_t>(data.begin() + pos + 4, data.begin() + key_length + 1);
     uint16_t key_length = read_le16(data[pos]);
 
     auto begin = data.begin() + pos + 4;
@@ -141,8 +138,6 @@ void BNode::append_kv(uint16_t idx, uint64_t ptr, const std::vector<uint8_t>& ke
 
     write_le16(pos, static_cast<uint16_t>(key.size()));
     write_le16(pos + 2, static_cast<uint16_t>(val.size()));
-    // write_le16(data[pos], key.size());
-    // write_le16(data[pos + 2], val.size());
 
     memcpy(&data[pos + 4], key.data(), key.size());
     memcpy(&data[pos + 4 + key.size()], val.data(), val.size());
@@ -157,14 +152,12 @@ uint16_t BNode::read_le16(size_t offset) const {
     uint16_t v;
     std::memcpy(&v, &data[offset], sizeof(v));
     return v;
-    // return static_cast<uint16_t>(data[offset]) | (static_cast<uint16_t>(data[offset + 1]) << 8);
 }
 
 uint64_t BNode::read_le64(size_t offset) const {
     uint64_t v;
     std::memcpy(&v, &data[offset], sizeof(v));
     return v;
-    // return static_cast<uint64_t>(data[offset]) | (static_cast<uint64_t>(data[offset + 1]) << 8);
 }
 
 void BNode::write_le16(size_t offset, uint16_t val) {
@@ -172,8 +165,6 @@ void BNode::write_le16(size_t offset, uint16_t val) {
         data.resize(offset + sizeof(val));
 
     std::memcpy(&data[offset], &val, sizeof(val));
-    // data[offset] = static_cast<uint8_t>(val & 0xFF);
-    // data[offset + 1] = static_cast<uint8_t>((val >> 8) & 0xFF);
 }
 
 void BNode::write_le64(size_t offset, uint64_t val) {
