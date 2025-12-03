@@ -58,6 +58,10 @@ uint16_t BNode::nkeys() const {
     return read_le16(2);    
 }
 
+uint16_t BNode::nbytes() {
+    return kv_pos(nkeys());    
+}
+
 uint64_t BNode::get_ptr(uint16_t idx) const {
     if (idx >= nkeys()) 
         throw std::out_of_range("child pointer idx is greater than number of keys");
@@ -92,7 +96,7 @@ void BNode::set_offset(uint16_t idx, uint16_t offset) {
 
 
 uint16_t BNode::kv_pos(uint16_t idx) {
-    if (idx >= nkeys()) 
+    if (idx > nkeys()) 
         throw std::out_of_range("kv idx is greater than number of keys");
 
     return 4 + 8 * nkeys() + 2 * nkeys() + get_offset(idx);
