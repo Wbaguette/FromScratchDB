@@ -78,9 +78,9 @@ void BNode::set_ptr(uint16_t idx, uint64_t val) {
     write_le64(pos, val);
 }
 
-uint16_t BNode::get_offset(uint16_t idx) {
+uint16_t BNode::get_offset(uint16_t idx) const {
     if (idx == 0) 
-        return 0;
+        return 0;   
 
     size_t pos = 4 + 8 * nkeys() + 2 * (idx - 1);
     return read_le16(pos);
@@ -95,14 +95,14 @@ void BNode::set_offset(uint16_t idx, uint16_t offset) {
 }   
 
 
-uint16_t BNode::kv_pos(uint16_t idx) {
+uint16_t BNode::kv_pos(uint16_t idx) const {
     if (idx > nkeys()) 
         throw std::out_of_range("kv idx is greater than number of keys");
 
     return 4 + 8 * nkeys() + 2 * nkeys() + get_offset(idx);
 }
 
-std::vector<uint8_t> BNode::get_key(uint16_t idx) {
+std::vector<uint8_t> BNode::get_key(uint16_t idx) const {
     if (idx >= nkeys()) 
         throw std::out_of_range("key index is greater than number of keys");
 
@@ -116,7 +116,7 @@ std::vector<uint8_t> BNode::get_key(uint16_t idx) {
     return std::vector<uint8_t>(begin, last);
 }
 
-std::vector<uint8_t> BNode::get_val(uint16_t idx) {
+std::vector<uint8_t> BNode::get_val(uint16_t idx) const {
     if (idx >= nkeys()) 
         throw std::out_of_range("val index is greater than number of keys");
 
@@ -141,4 +141,19 @@ void BNode::append_kv(uint16_t idx, uint64_t ptr, const std::vector<uint8_t>& ke
     memcpy(&data[pos + 4 + key.size()], val.data(), val.size());
 
     set_offset(idx + 1, get_offset(idx) + 4 + static_cast<uint16_t>(key.size() + val.size()));
+}
+
+void BNode::leaf_insert(const BNode& old, uint16_t idx, const std::vector<uint8_t>& key, const std::vector<uint8_t>& val) {
+    set_header(BNODE_LEAF, old.nkeys() + 1);
+    append_range(old, 0, 0, idx);
+    append_kv(idx, 0, key, val);
+    append_range(old, idx + 1, idx, old.nkeys() - idx);
+}
+
+void BNode::append_range(const BNode& old, uint16_t dst_new, uint16_t src_old, uint16_t n) {
+    for (size_t i = 0; i < n; i++) {
+        uint16_t dst = dst_new + i;
+        uint16_t src = src_old + i;
+        append_kv(dst, old.get_ptr(src), old.get_key(src), old.get_val(src));
+    }
 }

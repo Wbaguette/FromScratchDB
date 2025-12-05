@@ -38,12 +38,14 @@ public:
     }
     uint64_t get_ptr(uint16_t idx) const;
     void set_ptr(uint16_t idx, uint64_t val);
-    uint16_t get_offset(uint16_t idx);
+    uint16_t get_offset(uint16_t idx) const;
     void set_offset(uint16_t idx, uint16_t offset);
-    uint16_t kv_pos(uint16_t idx);
-    std::vector<uint8_t> get_key(uint16_t idx);
-    std::vector<uint8_t> get_val(uint16_t idx);
+    uint16_t kv_pos(uint16_t idx) const ;
+    std::vector<uint8_t> get_key(uint16_t idx) const;
+    std::vector<uint8_t> get_val(uint16_t idx) const;
     void append_kv(uint16_t idx, uint64_t ptr, const std::vector<uint8_t>& key, const std::vector<uint8_t>& val);
+    void leaf_insert(const BNode& old, uint16_t idx, const std::vector<uint8_t>& key, const std::vector<uint8_t>& val);
+    void append_range(const BNode& old, uint16_t dst_new, uint16_t src_old, uint16_t n);
     friend std::ostream& operator<<(std::ostream& os, const BNode& b_node);
 
 private:
