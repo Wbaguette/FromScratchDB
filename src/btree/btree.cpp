@@ -5,6 +5,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string_view>
+#include <utility>
 #include <vector>
 #include <iostream>
 
@@ -59,7 +60,7 @@ uint16_t BNode::nkeys() const {
     return read_le16(2);    
 }
 
-uint16_t BNode::nbytes() {
+uint16_t BNode::nbytes() const {
     return kv_pos(nkeys());    
 }
 
@@ -181,4 +182,45 @@ uint16_t BNode::lookup_le_pos(ByteVecView key) const {
     }
 
     return i - 1;
+}
+
+std::pair<BNode, BNode> BNode::split() const {
+    if (nkeys() < 2) 
+        throw std::out_of_range("Too little keys to split into two");
+
+    // The idea is to find how many bytes to put into the left BNode while being within the page size
+    size_t n_left = nkeys() / 2;
+    while (true) {
+        size_t left_bytes = 4 + 8 * n_left + 2 * n_left + get_offset(n_left);
+        if (n_left == 0 || left_bytes <= BTREE_PAGE_SIZE)
+            break;
+        n_left--;    
+    }
+    if (n_left < 1)
+        throw std::length_error("Cannot split when left BNode will be size 0");
+
+    // Try to equalize the number of bytes for the right BNode
+    while (true) {
+        size_t left_bytes = 4 + 8 * n_left + 2 * n_left + get_offset(n_left);
+        size_t right_bytes = nbytes() - left_bytes + 4;
+        if (right_bytes <= BTREE_PAGE_SIZE)
+            break;
+        n_left++; 
+    }
+    if (n_left >= nkeys()) 
+        throw std::length_error("Cannot split when right BNode will be size 0");
+
+    size_t n_right = nkeys() - n_left;
+
+    BNode left;
+    left.set_header(btype(), n_left);
+    left.append_range(*this, 0, 0, n_left);
+    BNode right;
+    right.set_header(btype(), n_right);
+    right.append_range(*this, 0, n_left, n_right);
+
+    if (right.nbytes() > BTREE_PAGE_SIZE) 
+        throw std::length_error("Right BNode bytes size exceed max BTREE_PAGE_SIZE");
+
+    return std::pair<BNode, BNode> { left, right };
 }

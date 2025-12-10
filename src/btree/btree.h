@@ -36,7 +36,7 @@ public:
     BNode(size_t size = BTREE_PAGE_SIZE);
     uint16_t btype() const;
     uint16_t nkeys() const;
-    uint16_t nbytes();
+    uint16_t nbytes() const;
     inline void set_header(uint16_t btype, uint16_t nkeys) {
         write_le16(0, btype);
         write_le16(2, nkeys);
@@ -53,7 +53,8 @@ public:
     void leaf_update(const BNode& old, uint16_t idx, ByteVecView key, ByteVecView val);
     void append_range(const BNode& old, uint16_t dst_new, uint16_t src_old, uint16_t n);
     uint16_t lookup_le_pos(ByteVecView key) const;
-    
+    std::pair<BNode, BNode> split() const;
+
     friend std::ostream& operator<<(std::ostream& os, const BNode& b_node);
 
 private:

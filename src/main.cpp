@@ -1,7 +1,9 @@
 #include "btree/btree.h"
 #include "utils/bytes.h"
 #include <cstdint>
+#include <cstring>
 #include <iostream>
+
 
 int main() {
     BNode b;
@@ -24,8 +26,9 @@ int main() {
     for (uint8_t c : val) {
         std::cout << static_cast<char>(c);
     }
-
-
+    
+    
+    
 
 }
     
