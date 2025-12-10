@@ -1,4 +1,5 @@
 #include "btree.h"
+#include "../utils/bytes.h"
 #include <cstdint>
 #include <cstring>
 #include <memory>
@@ -102,7 +103,7 @@ uint16_t BNode::kv_pos(uint16_t idx) const {
     return 4 + 8 * nkeys() + 2 * nkeys() + get_offset(idx);
 }
 
-std::vector<uint8_t> BNode::get_key(uint16_t idx) const {
+ByteVecView BNode::get_key(uint16_t idx) const {
     if (idx >= nkeys()) 
         throw std::out_of_range("key index is greater than number of keys");
 
@@ -110,13 +111,13 @@ std::vector<uint8_t> BNode::get_key(uint16_t idx) const {
     uint16_t key_length = read_le16(pos);
 
 
-    auto begin = data.begin() + pos + 4;
-    auto last = begin + key_length;
-
-    return std::vector<uint8_t>(begin, last);
+    // auto begin = data.begin() + pos + 4;
+    // auto last = begin + key_length;
+    // return std::vector<uint8_t>(begin, last);
+    return ByteVecView(&data[pos + 4], key_length);
 }
 
-std::vector<uint8_t> BNode::get_val(uint16_t idx) const {
+ByteVecView BNode::get_val(uint16_t idx) const {
     if (idx >= nkeys()) 
         throw std::out_of_range("val index is greater than number of keys");
 
@@ -124,13 +125,14 @@ std::vector<uint8_t> BNode::get_val(uint16_t idx) const {
     uint16_t key_length = read_le16(pos);
     uint16_t val_length = read_le16(pos + 2);
 
-    auto begin = data.begin() + pos + 4 + key_length;
-    auto last   = begin + val_length;
+    // auto begin = data.begin() + pos + 4 + key_length;
+    // auto last   = begin + val_length;
 
-    return std::vector<uint8_t>(begin, last);
+    // return std::vector<uint8_t>(begin, last);
+    return ByteVecView(&data[pos + 4 + key_length], val_length);
 }
 
-void BNode::append_kv(uint16_t idx, uint64_t ptr, const std::vector<uint8_t>& key, const std::vector<uint8_t>& val) {
+void BNode::append_kv(uint16_t idx, uint64_t ptr, ByteVecView key, ByteVecView val) {
     set_ptr(idx, ptr);
     size_t pos = kv_pos(idx);
     
@@ -143,11 +145,18 @@ void BNode::append_kv(uint16_t idx, uint64_t ptr, const std::vector<uint8_t>& ke
     set_offset(idx + 1, get_offset(idx) + 4 + static_cast<uint16_t>(key.size() + val.size()));
 }
 
-void BNode::leaf_insert(const BNode& old, uint16_t idx, const std::vector<uint8_t>& key, const std::vector<uint8_t>& val) {
+void BNode::leaf_insert(const BNode& old, uint16_t idx, ByteVecView key, ByteVecView val) {
     set_header(BNODE_LEAF, old.nkeys() + 1);
     append_range(old, 0, 0, idx);
     append_kv(idx, 0, key, val);
     append_range(old, idx + 1, idx, old.nkeys() - idx);
+}
+
+void BNode::leaf_update(const BNode& old, uint16_t idx, ByteVecView key, ByteVecView val) {
+    set_header(BNODE_LEAF, old.nkeys());
+    append_range(old, 0, 0, idx);
+    append_kv(idx, 0, key, val);
+    append_range(old, idx + 1, idx + 1, old.nkeys() - (idx + 1));
 }
 
 void BNode::append_range(const BNode& old, uint16_t dst_new, uint16_t src_old, uint16_t n) {
@@ -156,4 +165,20 @@ void BNode::append_range(const BNode& old, uint16_t dst_new, uint16_t src_old, u
         uint16_t src = src_old + i;
         append_kv(dst, old.get_ptr(src), old.get_key(src), old.get_val(src));
     }
+}
+
+// Find the last position that is less than or equal to the key
+uint16_t BNode::lookup_le_pos(ByteVecView key) const {
+    uint16_t n_keys = nkeys();
+    size_t i = 0;
+    // TODO: Could possible be binary search 
+    for (; i < n_keys; i++) {
+        const ByteVecView this_key = get_key(i);
+        int cmp = lex_cmp_byte_vecs(this_key, key);
+        // 0 if a == b, -1 if a < b, and +1 if a > b.
+        if (cmp == 0) return i; // Equal means this index is where they are <=
+        if (cmp > 0) return i - 1; // a > b therefore the previous index is where it is <= 
+    }
+
+    return i - 1;
 }

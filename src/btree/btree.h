@@ -3,6 +3,7 @@
 #include <memory>
 #include <ostream>
 #include <vector>
+#include <span>
 
 constexpr int BNODE_NODE = 1;
 constexpr int BNODE_LEAF = 2; 
@@ -10,6 +11,10 @@ constexpr int BNODE_LEAF = 2;
 constexpr int BTREE_PAGE_SIZE = 4096;
 constexpr int BTREE_MAX_KEY_SIZE = 1000;
 constexpr int BTREE_MAX_VAL_SIZE = 3000;
+
+// Non-owning, readonly, vector of bytes
+typedef std::span<const uint8_t> ByteVecView;
+
 
 struct Node {
 public:
@@ -41,11 +46,14 @@ public:
     uint16_t get_offset(uint16_t idx) const;
     void set_offset(uint16_t idx, uint16_t offset);
     uint16_t kv_pos(uint16_t idx) const ;
-    std::vector<uint8_t> get_key(uint16_t idx) const;
-    std::vector<uint8_t> get_val(uint16_t idx) const;
-    void append_kv(uint16_t idx, uint64_t ptr, const std::vector<uint8_t>& key, const std::vector<uint8_t>& val);
-    void leaf_insert(const BNode& old, uint16_t idx, const std::vector<uint8_t>& key, const std::vector<uint8_t>& val);
+    ByteVecView get_key(uint16_t idx) const;
+    ByteVecView get_val(uint16_t idx) const;
+    void append_kv(uint16_t idx, uint64_t ptr, ByteVecView key, ByteVecView val);
+    void leaf_insert(const BNode& old, uint16_t idx, ByteVecView key, ByteVecView val);
+    void leaf_update(const BNode& old, uint16_t idx, ByteVecView key, ByteVecView val);
     void append_range(const BNode& old, uint16_t dst_new, uint16_t src_old, uint16_t n);
+    uint16_t lookup_le_pos(ByteVecView key) const;
+    
     friend std::ostream& operator<<(std::ostream& os, const BNode& b_node);
 
 private:
