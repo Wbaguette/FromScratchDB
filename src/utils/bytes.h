@@ -2,7 +2,7 @@
 #include <cstdint>
 #include <vector>
 #include <string_view>
-#include "../btree/btree.h"
+#include "../btree/bnode.h"
 
 int lex_cmp_byte_vecs(ByteVecView a, ByteVecView b);
 
