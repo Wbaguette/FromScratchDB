@@ -2,7 +2,6 @@
 #include "btree.h"
 #include <cstdint>
 #include <ostream>
-#include <tuple>
 #include <vector>
 #include <span>
 
@@ -16,7 +15,19 @@ struct BNode {
 public:
     std::vector<uint8_t> m_Data;
 
+    // Constructor
     BNode(size_t size = BTREE_PAGE_SIZE);
+    // Copy constructor
+    BNode(const BNode& other) = default;
+    // Destructor
+    ~BNode() = default;
+    // Copy assignment constructor
+    BNode& operator=(const BNode& other) = default;
+    // Move constructor
+    BNode(BNode&& other) noexcept = default;
+    // Move assignment 
+    BNode& operator=(BNode&& other) noexcept = default;
+
     uint16_t btype() const;
     uint16_t nkeys() const;
     uint16_t nbytes() const;
@@ -36,8 +47,8 @@ public:
     void leaf_update(const BNode& old, uint16_t idx, ByteVecView key, ByteVecView val);
     void append_range(const BNode& old, uint16_t dst_new, uint16_t src_old, uint16_t n);
     uint16_t lookup_le_pos(ByteVecView key) const;
-    std::pair<BNode, BNode> split_half() const;
-    std::vector<BNode> try_split_thrice() const;
+    void split_half(BNode& left, BNode& right) const;
+    std::vector<BNode> try_split_thrice();
 
     friend std::ostream& operator<<(std::ostream& os, const BNode& b_node);
 

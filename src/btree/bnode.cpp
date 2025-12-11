@@ -172,7 +172,7 @@ uint16_t BNode::lookup_le_pos(ByteVecView key) const {
     return i - 1;
 }
 
-std::pair<BNode, BNode> BNode::split_half() const {
+void BNode::split_half(BNode& left, BNode& right) const {
     if (nkeys() < 2) 
         throw std::out_of_range("Too little keys to split into two");
 
@@ -200,22 +200,38 @@ std::pair<BNode, BNode> BNode::split_half() const {
 
     size_t n_right = nkeys() - n_left;
 
-    BNode left;
+    left.m_Data.clear();
     left.set_header(btype(), n_left);
     left.append_range(*this, 0, 0, n_left);
-    BNode right;
+
+    right.m_Data.clear();
     right.set_header(btype(), n_right);
     right.append_range(*this, 0, n_left, n_right);
 
     if (right.nbytes() > BTREE_PAGE_SIZE) 
         throw std::length_error("Right BNode bytes size exceed max BTREE_PAGE_SIZE");
-
-    return std::pair<BNode, BNode> { left, right };
 }
 
-std::vector<BNode> BNode::try_split_thrice() const {
+std::vector<BNode> BNode::try_split_thrice() {
   if (nbytes() <= BTREE_PAGE_SIZE) {
-    
+    m_Data.resize(BTREE_PAGE_SIZE);
   }
 
+  BNode left(2 * BTREE_PAGE_SIZE);
+  BNode right;
+  split_half(left, right);
+  if (left.nbytes() <= BTREE_PAGE_SIZE) {
+    left.m_Data.resize(BTREE_PAGE_SIZE);
+    return std::vector<BNode> { left, right };
+  }
+
+  // If we get here that means left is too big and we need to split again
+  BNode leftleft;
+  BNode middle; 
+  left.split_half(leftleft, middle);
+
+  if (leftleft.nbytes() > BTREE_PAGE_SIZE) 
+    throw std::length_error("Leftleft bytes size exceed max BTREE_PAGE_SIZE");
+  
+  return std::vector<BNode> { leftleft, middle, left };
 }
