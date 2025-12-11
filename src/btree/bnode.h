@@ -1,15 +1,12 @@
 #pragma once
-#include "btree.h"
+#include "../shared/treesizes.h"
+#include "../shared/bytevecview.h"
 #include <cstdint>
 #include <ostream>
 #include <vector>
-#include <span>
 
 constexpr int BNODE_NODE = 1;
 constexpr int BNODE_LEAF = 2; 
-
-// Non-owning, readonly, vector of bytes
-typedef std::span<const uint8_t> ByteVecView;
 
 struct BNode {
 public:
@@ -27,7 +24,6 @@ public:
     BNode(BNode&& other) noexcept = default;
     // Move assignment 
     BNode& operator=(BNode&& other) noexcept = default;
-
     uint16_t btype() const;
     uint16_t nkeys() const;
     uint16_t nbytes() const;

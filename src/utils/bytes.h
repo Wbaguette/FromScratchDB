@@ -1,8 +1,8 @@
 #pragma once
+#include "../shared/bytevecview.h"
 #include <cstdint>
 #include <vector>
 #include <string_view>
-#include "../btree/bnode.h"
 
 int lex_cmp_byte_vecs(ByteVecView a, ByteVecView b);
 

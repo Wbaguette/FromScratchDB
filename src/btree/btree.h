@@ -1,11 +1,9 @@
 #pragma once
+#include "../shared/bytevecview.h"
+#include "bnode.h"
 #include <cstdint>
 #include <memory>
 #include <vector>
-
-constexpr int BTREE_PAGE_SIZE = 4096;
-constexpr int BTREE_MAX_KEY_SIZE = 1000;
-constexpr int BTREE_MAX_VAL_SIZE = 3000;
 
 struct Node {
 public:
@@ -23,7 +21,21 @@ struct BTree {
 public:
     size_t m_Root;
 
-    ~BTree() = default;
+    // Constructor
     BTree(size_t root);
+    // Copy constructor
+    BTree(const BTree& other) = default;
+    // Destructor
+    ~BTree() = default;
+    // Copy assignment constructor
+    BTree& operator=(const BTree& other) = default;
+    // Move constructor
+    BTree(BTree&& other) noexcept = default;
+    // Move assignment 
+    BTree& operator=(BTree&& other) noexcept = default;
+    ByteVecView get(uint64_t);
+    uint64_t alloc(ByteVecView);
+    void del(uint64_t);
+    BNode insert_node(const BNode& node, ByteVecView key, ByteVecView data);
 
 };
