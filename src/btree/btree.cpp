@@ -57,7 +57,43 @@ void BTree::node_replace_kid_n(BNode& new_, const BNode& old, uint16_t idx, std:
     new_.set_header(BNODE_NODE, old.nkeys() + inc - 1);
     new_.append_range(old, 0, 0, idx);
     for (size_t i = 0; i < inc; i++) {
-        new_.append_kv(idx + static_cast<uint16_t>(i), alloc(kids[i].m_Data) , kids[i].get_key(0), ByteVecView{});
+        new_.append_kv(idx + static_cast<uint16_t>(i), alloc(kids[i].m_Data) , kids[i].get_key(0), {});
     }
     new_.append_range(old, idx + inc, idx + 1, old.nkeys() - (idx + 1));
+}
+
+void BTree::insert(ByteVecView key, ByteVecView val) {
+    if (key.size() == 0) 
+        throw std::runtime_error("key is empty");
+    if (key.size() > BTREE_MAX_KEY_SIZE) 
+        throw std::runtime_error("key's size is greater than max allowed");
+    if (val.size() > BTREE_MAX_VAL_SIZE) 
+        throw std::runtime_error("key's size is greater than max allowed");
+
+    if (m_Root == 0) {
+        BNode root(BTREE_PAGE_SIZE);
+        root.set_header(BNODE_LEAF, 2);
+
+        root.append_kv(0, 0, {}, {});
+        root.append_kv(1, 0, key, val);
+        m_Root = alloc(root.m_Data);
+        return;
+    }
+    
+    BNode node = insert_node(get(m_Root), key, val);
+    std::span<const BNode> res = node.try_split_thrice();
+    del(m_Root);
+
+    if (res.size() > 1) {
+        BNode root(BTREE_PAGE_SIZE);
+        root.set_header(BNODE_NODE, res.size());
+        for (size_t i = 0; i < res.size(); i++) {
+            uint64_t ptr = alloc(res[i].m_Data);
+            ByteVecView key = res[i].get_key(0);
+            root.append_kv(static_cast<uint16_t>(i), ptr, key, {});
+        }
+        m_Root = alloc(root.m_Data);
+    } else {
+        m_Root = alloc(res[0].m_Data);
+    }
 }
