@@ -14,6 +14,7 @@ public:
 
     // Constructor
     BNode(size_t size = BTREE_PAGE_SIZE);
+    BNode(ByteVecView data);
     // Copy constructor
     BNode(const BNode& other) = default;
     // Destructor
@@ -44,7 +45,7 @@ public:
     void append_range(const BNode& old, uint16_t dst_new, uint16_t src_old, uint16_t n);
     uint16_t lookup_le_pos(ByteVecView key) const;
     void split_half(BNode& left, BNode& right) const;
-    std::vector<BNode> try_split_thrice();
+    std::span<const BNode> try_split_thrice();
 
     friend std::ostream& operator<<(std::ostream& os, const BNode& b_node);
 

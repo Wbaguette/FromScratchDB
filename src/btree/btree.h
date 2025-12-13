@@ -37,5 +37,5 @@ public:
     uint64_t alloc(ByteVecView);
     void del(uint64_t);
     BNode insert_node(const BNode& node, ByteVecView key, ByteVecView data);
-
+    void node_replace_kid_n(BNode& new_, const BNode& old, uint16_t idx, std::span<const BNode> kids);
 };

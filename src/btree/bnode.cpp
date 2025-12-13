@@ -9,6 +9,7 @@
 #include <iostream>
 
 BNode::BNode(size_t size): m_Data(size) {} 
+BNode::BNode(ByteVecView data): m_Data(data.begin(), data.end()) {}
 
 std::ostream& operator<<(std::ostream& os, const BNode& b_node) {
     os << "BNode { " << std::endl; 
@@ -211,7 +212,7 @@ void BNode::split_half(BNode& left, BNode& right) const {
         throw std::length_error("Right BNode bytes size exceed max BTREE_PAGE_SIZE");
 }
 
-std::vector<BNode> BNode::try_split_thrice() {
+std::span<const BNode> BNode::try_split_thrice() {
   if (nbytes() <= BTREE_PAGE_SIZE) {
     m_Data.resize(BTREE_PAGE_SIZE);
   }
