@@ -3,6 +3,7 @@
 #include "bnode.h"
 #include <cstdint>
 #include <memory>
+#include <utility>
 #include <vector>
 
 struct Node {
@@ -38,10 +39,10 @@ public:
     void del(uint64_t page_num);
     void insert(ByteVecView key, ByteVecView val);
     int remove(ByteVecView key);
-    
+
 
 };
 
 BNode tree_insert(BTree& tree, const BNode& node, ByteVecView key, ByteVecView data);
 void node_replace_kid_n(BTree& tree, BNode& new_, const BNode& old, uint16_t idx, std::span<const BNode> kids);
-
+std::pair<int8_t, BNode> should_merge(BTree& tree, const BNode& node, uint16_t idx, const BNode& updated);

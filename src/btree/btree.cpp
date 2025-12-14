@@ -109,3 +109,25 @@ void node_replace_kid_n(BTree& tree, BNode& new_, const BNode& old, uint16_t idx
     }
     node_append_range(new_, old, idx + inc, idx + 1, old.nkeys() - (idx + 1));
 }
+
+std::pair<int8_t, BNode> should_merge(BTree& tree, const BNode& node, uint16_t idx, const BNode& updated) {
+    if (updated.nbytes() > BTREE_PAGE_SIZE / 4) 
+        return { 0, BNode{} };
+    
+
+    if (idx > 0) {
+        BNode sibling(tree.get(node.get_ptr(idx - 1)));
+        uint16_t merged = sibling.nbytes() + updated.nbytes() - static_cast<uint16_t>(HEADER);
+        if (merged <= static_cast<uint16_t>(BTREE_PAGE_SIZE)) 
+            return { -1, sibling };
+    }
+
+    if (idx + 1 < node.nbytes()) {
+        BNode sibling(tree.get(node.get_ptr(idx + 1)));
+        uint16_t merged = sibling.nbytes() + updated.nbytes() - static_cast<uint16_t>(HEADER);
+        if (merged <= static_cast<uint16_t>(BTREE_PAGE_SIZE)) 
+            return { 1, sibling };
+    }
+
+    return { 0, BNode{} };
+}
