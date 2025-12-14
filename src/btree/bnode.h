@@ -13,7 +13,7 @@ public:
     std::vector<uint8_t> m_Data;
 
     // Constructor
-    BNode(size_t size = BTREE_PAGE_SIZE);
+    explicit BNode(size_t size = BTREE_PAGE_SIZE);
     BNode(ByteVecView data);
     // Copy constructor
     BNode(const BNode& other) = default;
@@ -39,17 +39,9 @@ public:
     uint16_t kv_pos(uint16_t idx) const ;
     ByteVecView get_key(uint16_t idx) const;
     ByteVecView get_val(uint16_t idx) const;
-    void append_kv(uint16_t idx, uint64_t ptr, ByteVecView key, ByteVecView val);
-    void leaf_insert(const BNode& old, uint16_t idx, ByteVecView key, ByteVecView val);
-    void leaf_update(const BNode& old, uint16_t idx, ByteVecView key, ByteVecView val);
-    void append_range(const BNode& old, uint16_t dst_new, uint16_t src_old, uint16_t n);
-    uint16_t lookup_le_pos(ByteVecView key) const;
-    void split_half(BNode& left, BNode& right) const;
-    std::span<const BNode> try_split_thrice();
 
     friend std::ostream& operator<<(std::ostream& os, const BNode& b_node);
 
-private:
     inline uint16_t read_le16(size_t offset) const {
         uint16_t v;
         std::memcpy(&v, &m_Data[offset], sizeof(v));
@@ -74,3 +66,11 @@ private:
         std::memcpy(&m_Data[offset], &val, sizeof(val));
     }
 };
+
+void node_append_kv(BNode& new_, uint16_t idx, uint64_t ptr, ByteVecView key, ByteVecView val);
+std::span<const BNode> try_split_thrice(BNode& old);
+void split_half(BNode& left, BNode& right, const BNode& old);
+uint16_t lookup_le_pos(const BNode& node, ByteVecView key);
+void node_append_range(BNode& new_, const BNode& old, uint16_t dst_new, uint16_t src_old, uint16_t n);
+void leaf_update(BNode& new_, const BNode& old, uint16_t idx, ByteVecView key, ByteVecView val);
+void leaf_insert(BNode& new_, const BNode& old, uint16_t idx, ByteVecView key, ByteVecView val);

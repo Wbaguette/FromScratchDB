@@ -22,7 +22,7 @@ public:
     size_t m_Root;
 
     // Constructor
-    BTree(size_t root);
+    explicit BTree(size_t root);
     // Copy constructor
     BTree(const BTree& other) = default;
     // Destructor
@@ -33,14 +33,15 @@ public:
     BTree(BTree&& other) noexcept = default;
     // Move assignment 
     BTree& operator=(BTree&& other) noexcept = default;
-    ByteVecView get(uint64_t);
-    uint64_t alloc(ByteVecView);
-    void del(uint64_t);
-    BNode insert_node(const BNode& node, ByteVecView key, ByteVecView data);
-    void node_replace_kid_n(BNode& new_, const BNode& old, uint16_t idx, std::span<const BNode> kids);
-
+    ByteVecView get(uint64_t page_num) const;
+    uint64_t alloc(ByteVecView data);
+    void del(uint64_t page_num);
     void insert(ByteVecView key, ByteVecView val);
     int remove(ByteVecView key);
-
+    
 
 };
+
+BNode tree_insert(BTree& tree, const BNode& node, ByteVecView key, ByteVecView data);
+void node_replace_kid_n(BTree& tree, BNode& new_, const BNode& old, uint16_t idx, std::span<const BNode> kids);
+

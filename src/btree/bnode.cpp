@@ -9,6 +9,7 @@
 #include <iostream>
 
 BNode::BNode(size_t size): m_Data(size) {} 
+
 BNode::BNode(ByteVecView data): m_Data(data.begin(), data.end()) {}
 
 std::ostream& operator<<(std::ostream& os, const BNode& b_node) {
@@ -34,7 +35,6 @@ std::ostream& operator<<(std::ostream& os, const BNode& b_node) {
     
     return os;
 }
-
 
 uint16_t BNode::btype() const {
     if (m_Data.size() < 2)
@@ -114,55 +114,38 @@ ByteVecView BNode::get_val(uint16_t idx) const {
     uint16_t key_length = read_le16(pos);
     uint16_t val_length = read_le16(pos + 2);
 
-    // auto begin = m_Data.begin() + pos + 4 + key_length;
-    // auto last   = begin + val_length;
-
-    // return std::vector<uint8_t>(begin, last);
     return ByteVecView(&m_Data[pos + 4 + key_length], val_length);
 }
 
-void BNode::append_kv(uint16_t idx, uint64_t ptr, ByteVecView key, ByteVecView val) {
-    set_ptr(idx, ptr);
-    size_t pos = kv_pos(idx);
-    
-    write_le16(pos, static_cast<uint16_t>(key.size()));
-    write_le16(pos + 2, static_cast<uint16_t>(val.size()));
-
-    memcpy(&m_Data[pos + 4], key.data(), key.size());
-    memcpy(&m_Data[pos + 4 + key.size()], val.data(), val.size());
-
-    set_offset(idx + 1, get_offset(idx) + 4 + static_cast<uint16_t>(key.size() + val.size()));
+void leaf_insert(BNode& new_, const BNode& old, uint16_t idx, ByteVecView key, ByteVecView val) {
+    new_.set_header(BNODE_LEAF, old.nkeys() + 1);
+    node_append_range(new_, old, 0, 0, idx);
+    node_append_kv(new_, idx, 0, key, val);
+    node_append_range(new_, old, idx + 1, idx, old.nkeys() - idx);
 }
 
-void BNode::leaf_insert(const BNode& old, uint16_t idx, ByteVecView key, ByteVecView val) {
-    set_header(BNODE_LEAF, old.nkeys() + 1);
-    append_range(old, 0, 0, idx);
-    append_kv(idx, 0, key, val);
-    append_range(old, idx + 1, idx, old.nkeys() - idx);
+void leaf_update(BNode& new_, const BNode& old, uint16_t idx, ByteVecView key, ByteVecView val) {
+    new_.set_header(BNODE_LEAF, old.nkeys());
+    node_append_range(new_, old, 0, 0, idx);
+    node_append_kv(new_, idx, 0, key, val);
+    node_append_range(new_, old, idx + 1, idx + 1, old.nkeys() - (idx + 1));
 }
 
-void BNode::leaf_update(const BNode& old, uint16_t idx, ByteVecView key, ByteVecView val) {
-    set_header(BNODE_LEAF, old.nkeys());
-    append_range(old, 0, 0, idx);
-    append_kv(idx, 0, key, val);
-    append_range(old, idx + 1, idx + 1, old.nkeys() - (idx + 1));
-}
-
-void BNode::append_range(const BNode& old, uint16_t dst_new, uint16_t src_old, uint16_t n) {
+void node_append_range(BNode& new_, const BNode& old, uint16_t dst_new, uint16_t src_old, uint16_t n) {
     for (size_t i = 0; i < n; i++) {
-        uint16_t dst = dst_new + i;
-        uint16_t src = src_old + i;
-        append_kv(dst, old.get_ptr(src), old.get_key(src), old.get_val(src));
+        uint16_t dst = dst_new + static_cast<uint16_t>(i);
+        uint16_t src = src_old + static_cast<uint16_t>(i);
+        node_append_kv(new_, dst, old.get_ptr(src), old.get_key(src), old.get_val(src));
     }
 }
 
 // Find the last position that is less than or equal to the key
-uint16_t BNode::lookup_le_pos(ByteVecView key) const {
-    uint16_t n_keys = nkeys();
+uint16_t lookup_le_pos(const BNode& node, ByteVecView key) {
+    uint16_t n_keys = node.nkeys();
     size_t i = 0;
     // TODO: Could possible be binary search 
     for (; i < n_keys; i++) {
-        const ByteVecView this_key = get_key(i);
+        const ByteVecView this_key = node.get_key(i);
         int cmp = lex_cmp_byte_vecs(this_key, key);
         // 0 if a == b, -1 if a < b, and +1 if a > b.
         if (cmp == 0) return i; // Equal means this index is where they are <=
@@ -172,14 +155,14 @@ uint16_t BNode::lookup_le_pos(ByteVecView key) const {
     return i - 1;
 }
 
-void BNode::split_half(BNode& left, BNode& right) const {
-    if (nkeys() < 2) 
+void split_half(BNode& left, BNode& right, const BNode& old) {
+    if (old.nkeys() < 2) 
         throw std::out_of_range("Too little keys to split into two");
 
     // The idea is to find how many bytes to put into the left BNode while being within the page size
-    size_t n_left = nkeys() / 2;
+    size_t n_left = old.nkeys() / 2;
     while (true) {
-        size_t left_bytes = 4 + 8 * n_left + 2 * n_left + get_offset(n_left);
+        size_t left_bytes = 4 + 8 * n_left + 2 * n_left + old.get_offset(n_left);
         if (n_left == 0 || left_bytes <= BTREE_PAGE_SIZE)
             break;
         n_left--;    
@@ -189,37 +172,38 @@ void BNode::split_half(BNode& left, BNode& right) const {
 
     // Try to equalize the number of bytes for the right BNode
     while (true) {
-        size_t left_bytes = 4 + 8 * n_left + 2 * n_left + get_offset(n_left);
-        size_t right_bytes = nbytes() - left_bytes + 4;
+        size_t left_bytes = 4 + 8 * n_left + 2 * n_left + old.get_offset(n_left);
+        size_t right_bytes = old.nbytes() - left_bytes + 4;
         if (right_bytes <= BTREE_PAGE_SIZE)
             break;
         n_left++; 
     }
-    if (n_left >= nkeys()) 
+    if (n_left >= old.nkeys()) 
         throw std::length_error("Cannot split when right BNode will be size 0");
 
-    size_t n_right = nkeys() - n_left;
+    size_t n_right = old.nkeys() - n_left;
 
     left.m_Data.clear();
-    left.set_header(btype(), n_left);
-    left.append_range(*this, 0, 0, n_left);
+    left.set_header(old.btype(), n_left);
+    node_append_range(left, old, 0, 0, n_left);
 
     right.m_Data.clear();
-    right.set_header(btype(), n_right);
-    right.append_range(*this, 0, n_left, n_right);
+    right.set_header(old.btype(), n_right);
+    node_append_range(right, old, 0, n_left, n_right);
 
     if (right.nbytes() > BTREE_PAGE_SIZE) 
         throw std::length_error("Right BNode bytes size exceed max BTREE_PAGE_SIZE");
 }
 
-std::span<const BNode> BNode::try_split_thrice() {
-  if (nbytes() <= BTREE_PAGE_SIZE) {
-    m_Data.resize(BTREE_PAGE_SIZE);
+std::span<const BNode> try_split_thrice(BNode& old) {
+  if (old.nbytes() <= BTREE_PAGE_SIZE) {
+    old.m_Data.resize(BTREE_PAGE_SIZE);
+    return std::vector<BNode> { old };
   }
 
   BNode left(2 * BTREE_PAGE_SIZE);
   BNode right;
-  split_half(left, right);
+  split_half(left, right, old);
   if (left.nbytes() <= BTREE_PAGE_SIZE) {
     left.m_Data.resize(BTREE_PAGE_SIZE);
     return std::vector<BNode> { left, right };
@@ -228,10 +212,23 @@ std::span<const BNode> BNode::try_split_thrice() {
   // If we get here that means left is too big and we need to split again
   BNode leftleft;
   BNode middle; 
-  left.split_half(leftleft, middle);
+  split_half(leftleft, middle, left);
 
   if (leftleft.nbytes() > BTREE_PAGE_SIZE) 
     throw std::length_error("Leftleft bytes size exceed max BTREE_PAGE_SIZE");
   
   return std::vector<BNode> { leftleft, middle, left };
+}
+
+void node_append_kv(BNode& new_, uint16_t idx, uint64_t ptr, ByteVecView key, ByteVecView val) {
+    new_.set_ptr(idx, ptr);
+    size_t pos = new_.kv_pos(idx);
+    
+    new_.write_le16(pos, static_cast<uint16_t>(key.size()));
+    new_.write_le16(pos + 2, static_cast<uint16_t>(val.size()));
+
+    memcpy(&new_.m_Data[pos + 4], key.data(), key.size());
+    memcpy(&new_.m_Data[pos + 4 + key.size()], val.data(), val.size());
+
+    new_.set_offset(idx + 1, new_.get_offset(idx) + 4 + static_cast<uint16_t>(key.size() + val.size()));
 }
