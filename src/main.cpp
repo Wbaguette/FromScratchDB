@@ -4,6 +4,7 @@
 #include <cstring>
 #include <iostream>
 
+// TODO: static casts on stuff because fuck this language 
 
 int main() {
     BNode b;

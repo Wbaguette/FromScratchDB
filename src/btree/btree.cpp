@@ -21,7 +21,7 @@ std::unique_ptr<Node> Node::decode(std::vector<uint8_t> page) {}
 BTree::BTree(size_t root): m_Root(root) {} 
 
 ByteVecView BTree::get(uint64_t page_num) const {
-
+    
 }
 
 uint64_t BTree::alloc(ByteVecView data) {
@@ -68,6 +68,26 @@ void BTree::insert(ByteVecView key, ByteVecView val) {
     }
 }
 
+bool BTree::remove(ByteVecView key) {
+    if (key.size() == 0) 
+        throw std::length_error("Key to remove has size 0");
+    if (key.size() > BTREE_MAX_KEY_SIZE)
+        throw std::length_error("Key to remove has size greater than max allowed");
+    
+    BNode updated = tree_delete_key(*this, get(m_Root), key);
+    if (updated.m_Data.size() == 0) 
+        return false;
+    
+    del(m_Root);
+    if (updated.btype() == BNODE_NODE && updated.nkeys() == 1) {
+        m_Root = static_cast<size_t>(updated.get_ptr(0));
+    } else {
+        m_Root = static_cast<size_t>(alloc(updated.m_Data));
+    }
+
+    return true;
+}
+
 BNode tree_insert(BTree& tree, const BNode& node, ByteVecView key, ByteVecView val) {
     BNode new_(2 * BTREE_PAGE_SIZE);
 
@@ -110,6 +130,42 @@ void node_replace_kid_n(BTree& tree, BNode& new_, const BNode& old, uint16_t idx
     node_append_range(new_, old, idx + inc, idx + 1, old.nkeys() - (idx + 1));
 }
 
+void node_merge(BNode& new_, BNode& left, BNode& right) {
+    new_.set_header(left.btype(), left.nkeys() + right.nkeys());
+    node_append_range(new_, left, 0, 0, left.nkeys());
+    node_append_range(new_, right, left.nkeys(), 0, right.nkeys());
+}
+
+void leaf_delete_key(BNode& new_, const BNode& old, uint16_t idx) {
+    new_.set_header(BNODE_LEAF, old.nkeys() - 1);
+    node_append_range(new_, old, 0, 0, idx);
+    node_append_range(new_, old, idx, idx + 1, old.nkeys() - (idx + 1));
+}
+
+BNode tree_delete_key(BTree& tree, const BNode& node, ByteVecView key) {
+    uint16_t idx = lookup_le_pos(node, key);
+
+    switch (node.btype()) {
+        case BNODE_LEAF: {
+            if (lex_cmp_byte_vecs(key, node.get_key(idx)) != 0) {
+                return BNode{};
+            }
+
+            BNode new_(BTREE_PAGE_SIZE);
+            leaf_delete_key(new_, node, idx);
+
+            return new_;
+        }
+        case BNODE_NODE: {
+            return node_delete_key(tree, node, idx, key);
+        }
+        default: {
+            throw std::runtime_error("Switch on node btype gave value other than predefined consts");
+        }
+    }
+}
+
+
 std::pair<int8_t, BNode> should_merge(BTree& tree, const BNode& node, uint16_t idx, const BNode& updated) {
     if (updated.nbytes() > BTREE_PAGE_SIZE / 4) 
         return { 0, BNode{} };
@@ -130,4 +186,53 @@ std::pair<int8_t, BNode> should_merge(BTree& tree, const BNode& node, uint16_t i
     }
 
     return { 0, BNode{} };
+}
+
+void node_replace_2_kid(BNode& new_, const BNode& old, uint16_t idx, uint64_t merged, ByteVecView key) {
+    new_.set_header(BNODE_NODE, old.nkeys() - 1);
+    node_append_range(new_, old, 0, 0, idx);
+    node_append_kv(new_, idx, merged, key, {});
+    node_append_range(new_, old, idx + 1, idx + 2, old.nkeys() - (idx + 1));
+}
+
+BNode node_delete_key(BTree& tree, const BNode& node, uint16_t idx, ByteVecView key) {
+    uint64_t k_ptr = node.get_ptr(idx);
+    BNode updated = tree_delete_key(tree, tree.get(k_ptr), key);
+    if (updated.m_Data.size() == 0) {
+        return BNode{};
+    }
+
+    tree.del(k_ptr);
+    BNode new_(BTREE_PAGE_SIZE);
+    auto [merge_dir, sibling] = should_merge(tree, node, idx, updated);
+    switch (merge_dir) {
+        case -1: {
+            BNode merged(BTREE_PAGE_SIZE);
+            node_merge(merged, sibling, updated);
+            tree.del(node.get_ptr(idx - 1));
+            node_replace_2_kid(new_, node, idx - 1, tree.alloc(merged.m_Data), merged.get_key(0));
+            break;
+        }
+        case 1: {
+            BNode merged(BTREE_PAGE_SIZE);
+            node_merge(merged, sibling, updated);
+            tree.del(node.get_ptr(idx + 1));
+            node_replace_2_kid(new_, node, idx - 1, tree.alloc(merged.m_Data), merged.get_key(0));
+            break;
+        }
+        case 0: {
+            if (updated.nkeys() == 0) {
+                if (node.nkeys() != 0 || idx != 0) {
+                    throw std::runtime_error("Node num keys not 0 or idx is not 0");
+                }
+                new_.set_header(BNODE_NODE, 0);
+            } else {
+                node_replace_kid_n(tree, new_, node, idx, std::vector<BNode> { updated });                
+            }
+            break;
+        }
+        default: {
+            throw std::runtime_error("Switch on merge dir gave value other than -1, 1, 0");
+        }
+    }
 }
