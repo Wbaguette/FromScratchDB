@@ -5,6 +5,7 @@
 #include <iostream>
 
 int main() {
+   
     BNode b;
     b.set_header(BNODE_LEAF, 3);
     
