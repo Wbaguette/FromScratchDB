@@ -46,13 +46,13 @@ void BTree::insert(ByteVecView key, ByteVecView val) {
 
         node_append_kv(root, 0, 0, {}, {});
         node_append_kv(root, 1, 0, key, val);
-        m_Root = alloc(root.m_Data);
+        m_Root = static_cast<size_t>(alloc(root.m_Data));
         return;
     }
     
     BNode node = tree_insert(*this, get(m_Root), key, val);
     std::span<const BNode> res = try_split_thrice(node);
-    del(m_Root);
+    del(static_cast<uint64_t>(m_Root));
 
     if (res.size() > 1) {
         BNode root(BTREE_PAGE_SIZE);
@@ -62,9 +62,9 @@ void BTree::insert(ByteVecView key, ByteVecView val) {
             ByteVecView key = res[i].get_key(0);
             node_append_kv(root, static_cast<uint16_t>(i), ptr, key, {});
         }
-        m_Root = alloc(root.m_Data);
+        m_Root = static_cast<size_t>(alloc(root.m_Data));
     } else {
-        m_Root = alloc(res[0].m_Data);
+        m_Root = static_cast<size_t>(alloc(res[0].m_Data));
     }
 }
 
@@ -79,7 +79,7 @@ bool BTree::remove(ByteVecView key) {
         return false;
     
     del(m_Root);
-    if (updated.btype() == BNODE_NODE && updated.nkeys() == 1) {
+    if (updated.btype() == static_cast<uint16_t>(BNODE_NODE) && updated.nkeys() == 1) {
         m_Root = static_cast<size_t>(updated.get_ptr(0));
     } else {
         m_Root = static_cast<size_t>(alloc(updated.m_Data));
@@ -165,9 +165,8 @@ BNode tree_delete_key(BTree& tree, const BNode& node, ByteVecView key) {
     }
 }
 
-
 std::pair<int8_t, BNode> should_merge(BTree& tree, const BNode& node, uint16_t idx, const BNode& updated) {
-    if (updated.nbytes() > BTREE_PAGE_SIZE / 4) 
+    if (updated.nbytes() > static_cast<uint16_t>(BTREE_PAGE_SIZE) / 4) 
         return { 0, BNode{} };
     
 
@@ -235,4 +234,6 @@ BNode node_delete_key(BTree& tree, const BNode& node, uint16_t idx, ByteVecView 
             throw std::runtime_error("Switch on merge dir gave value other than -1, 1, 0");
         }
     }
+
+    return new_;
 }

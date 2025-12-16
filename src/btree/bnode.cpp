@@ -1,6 +1,7 @@
 #include "bnode.h"
 #include "../utils/bytes.h"
 #include "../shared/treesizes.h"
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <stdexcept>
@@ -56,7 +57,7 @@ uint64_t BNode::get_ptr(uint16_t idx) const {
     if (idx >= nkeys()) 
         throw std::out_of_range("child pointer idx is greater than number of keys");
 
-    size_t pos = 4 + 8 * idx; // Position of child pointer is 4 bytes (header) + 8 * position (each child pointer is 8 bytes on 64bit arch)
+    size_t pos = 4 + 8 * static_cast<size_t>(idx); // Position of child pointer is 4 bytes (header) + 8 * position (each child pointer is 8 bytes on 64bit arch)
     return read_le64(pos);
 }
 
@@ -64,7 +65,7 @@ void BNode::set_ptr(uint16_t idx, uint64_t val) {
     if (idx >= nkeys()) 
         throw std::out_of_range("child pointer idx is greater than number of keys");
 
-    size_t pos = 4 + 8 * idx; // Position of child pointer is 4 bytes (header) + 8 * position (each child pointer is 8 bytes on 64bit arch)
+    size_t pos = 4 + 8 * static_cast<size_t>(idx); // Position of child pointer is 4 bytes (header) + 8 * position (each child pointer is 8 bytes on 64bit arch)
     write_le64(pos, val);
 }
 
@@ -72,15 +73,17 @@ uint16_t BNode::get_offset(uint16_t idx) const {
     if (idx == 0) 
         return 0;   
 
-    size_t pos = 4 + 8 * nkeys() + 2 * (idx - 1);
+    size_t pos = 4 + 8 * static_cast<size_t>(nkeys()) + 2 * (static_cast<size_t>(idx) - 1);
     return read_le16(pos);
 }
 
 void BNode::set_offset(uint16_t idx, uint16_t offset) {
     if (idx > nkeys())
         throw std::out_of_range("offset pos idx is greater than number of keys");
+    if (idx == 0) 
+        throw std::out_of_range("offset pos idx cannot be 0");
 
-    size_t pos = 4 + 8 * nkeys() + 2 * (idx - 1);
+    size_t pos = 4 + 8 * static_cast<size_t>(nkeys()) + 2 * (static_cast<size_t>(idx) - 1);
     write_le16(pos, offset);
 }   
 
@@ -96,13 +99,9 @@ ByteVecView BNode::get_key(uint16_t idx) const {
     if (idx >= nkeys()) 
         throw std::out_of_range("key index is greater than number of keys");
 
-    size_t pos = kv_pos(idx);
+    size_t pos = static_cast<size_t>(kv_pos(idx));
     uint16_t key_length = read_le16(pos);
 
-
-    // auto begin = m_Data.begin() + pos + 4;
-    // auto last = begin + key_length;
-    // return std::vector<uint8_t>(begin, last);
     return ByteVecView(&m_Data[pos + 4], key_length);
 }
 
@@ -145,25 +144,24 @@ uint16_t lookup_le_pos(const BNode& node, ByteVecView key) {
     size_t i = 0;
     // TODO: Could possible be binary search 
     for (; i < n_keys; i++) {
-        const ByteVecView this_key = node.get_key(i);
+        const ByteVecView this_key = node.get_key(static_cast<uint16_t>(i));
         int cmp = lex_cmp_byte_vecs(this_key, key);
         // 0 if a == b, -1 if a < b, and +1 if a > b.
-        if (cmp == 0) return i; // Equal means this index is where they are <=
-        if (cmp > 0) return i - 1; // a > b therefore the previous index is where it is <= 
+        if (cmp == 0) return static_cast<uint16_t>(i); // Equal means this index is where they are <=
+        if (cmp > 0) return static_cast<uint16_t>(i) - 1; // a > b therefore the previous index is where it is <= 
     }
 
-    return i - 1;
+    return static_cast<uint16_t>(i) - 1;
 }
 
 void split_half(BNode& left, BNode& right, const BNode& old) {
     if (old.nkeys() < 2) 
         throw std::out_of_range("Too little keys to split into two");
-
     // The idea is to find how many bytes to put into the left BNode while being within the page size
     size_t n_left = old.nkeys() / 2;
     while (true) {
-        size_t left_bytes = 4 + 8 * n_left + 2 * n_left + old.get_offset(n_left);
-        if (n_left == 0 || left_bytes <= BTREE_PAGE_SIZE)
+        size_t left_bytes = 4 + 8 * n_left + 2 * n_left + old.get_offset(static_cast<uint16_t>(n_left));
+        if (n_left == 0 || left_bytes <= static_cast<size_t>(BTREE_PAGE_SIZE))
             break;
         n_left--;    
     }
@@ -172,31 +170,31 @@ void split_half(BNode& left, BNode& right, const BNode& old) {
 
     // Try to equalize the number of bytes for the right BNode
     while (true) {
-        size_t left_bytes = 4 + 8 * n_left + 2 * n_left + old.get_offset(n_left);
+        size_t left_bytes = 4 + 8 * n_left + 2 * n_left + old.get_offset(static_cast<uint16_t>(n_left));
         size_t right_bytes = old.nbytes() - left_bytes + 4;
-        if (right_bytes <= BTREE_PAGE_SIZE)
+        if (right_bytes <= static_cast<size_t>(BTREE_PAGE_SIZE))
             break;
         n_left++; 
     }
     if (n_left >= old.nkeys()) 
         throw std::length_error("Cannot split when right BNode will be size 0");
 
-    size_t n_right = old.nkeys() - n_left;
+    size_t n_right = static_cast<size_t>(old.nkeys()) - n_left;
 
     left.m_Data.clear();
-    left.set_header(old.btype(), n_left);
-    node_append_range(left, old, 0, 0, n_left);
+    left.set_header(old.btype(), static_cast<uint16_t>(n_left));
+    node_append_range(left, old, 0, 0, static_cast<uint16_t>(n_left));
 
     right.m_Data.clear();
-    right.set_header(old.btype(), n_right);
-    node_append_range(right, old, 0, n_left, n_right);
+    right.set_header(old.btype(), static_cast<uint16_t>(n_right));
+    node_append_range(right, old, 0, static_cast<uint16_t>(n_left), static_cast<uint16_t>(n_right));
 
-    if (right.nbytes() > BTREE_PAGE_SIZE) 
+    if (right.nbytes() > static_cast<uint16_t>(BTREE_PAGE_SIZE))
         throw std::length_error("Right BNode bytes size exceed max BTREE_PAGE_SIZE");
 }
 
 std::span<const BNode> try_split_thrice(BNode& old) {
-  if (old.nbytes() <= BTREE_PAGE_SIZE) {
+  if (old.nbytes() <= static_cast<uint16_t>(BTREE_PAGE_SIZE)) {
     old.m_Data.resize(BTREE_PAGE_SIZE);
     return std::vector<BNode> { old };
   }
@@ -204,7 +202,7 @@ std::span<const BNode> try_split_thrice(BNode& old) {
   BNode left(2 * BTREE_PAGE_SIZE);
   BNode right;
   split_half(left, right, old);
-  if (left.nbytes() <= BTREE_PAGE_SIZE) {
+  if (left.nbytes() <= static_cast<uint16_t>(BTREE_PAGE_SIZE)) {
     left.m_Data.resize(BTREE_PAGE_SIZE);
     return std::vector<BNode> { left, right };
   }
@@ -214,7 +212,7 @@ std::span<const BNode> try_split_thrice(BNode& old) {
   BNode middle; 
   split_half(leftleft, middle, left);
 
-  if (leftleft.nbytes() > BTREE_PAGE_SIZE) 
+  if (leftleft.nbytes() > static_cast<uint16_t>(BTREE_PAGE_SIZE)) 
     throw std::length_error("Leftleft bytes size exceed max BTREE_PAGE_SIZE");
   
   return std::vector<BNode> { leftleft, middle, left };

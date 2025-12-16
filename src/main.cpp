@@ -4,15 +4,10 @@
 #include <cstring>
 #include <iostream>
 
-// TODO: static casts on stuff because fuck this language 
-
 int main() {
     BNode b;
     b.set_header(BNODE_LEAF, 3);
     
-    // node_append_kv(b, 0, 0, str_to_byte_vec("k1"), ByteVecView val)
-
-
     node_append_kv(b, 0, 0, str_to_byte_vec("k1"), str_to_byte_vec("hi"));
     std::cout << b << std::endl;
 
