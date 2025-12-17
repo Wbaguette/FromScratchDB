@@ -2,6 +2,7 @@
 #include "../shared/bytevecview.h"
 #include "bnode.h"
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -21,9 +22,16 @@ public:
 struct BTree {
 public:
     size_t m_Root;
+    struct Callbacks {
+        std::function<ByteVecView(uint64_t)> get;
+        std::function<uint64_t(ByteVecView)> alloc;
+        std::function<void(uint64_t)> del;
+    };
+    Callbacks m_Callbacks;
 
     // Constructor
     explicit BTree(size_t root);
+    explicit BTree(Callbacks cbks);
     // Copy constructor
     BTree(const BTree& other) = default;
     // Destructor
@@ -34,13 +42,8 @@ public:
     BTree(BTree&& other) noexcept = default;
     // Move assignment 
     BTree& operator=(BTree&& other) noexcept = default;
-    ByteVecView get(uint64_t page_num) const;
-    uint64_t alloc(ByteVecView data);
-    void del(uint64_t page_num);
     void insert(ByteVecView key, ByteVecView val);
     bool remove(ByteVecView key);
-
-
 };
 
 BNode tree_insert(BTree& tree, const BNode& node, ByteVecView key, ByteVecView data);

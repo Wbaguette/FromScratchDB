@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 #include <cstdint>
+#include <string_view>
 
 struct C {
   public:
@@ -24,7 +25,10 @@ struct C {
     C(C&& other) noexcept = default;
     // Move assignment 
     C& operator=(C&& other) noexcept = default;
+    void add(std::string_view key, std::string_view val);
 
-
-
+  private:
+    ByteVecView get_page(uint64_t ptr);
+    uint64_t alloc_page(ByteVecView node);
+    void del_page(uint64_t ptr);
 };
