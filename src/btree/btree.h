@@ -3,21 +3,19 @@
 #include "bnode.h"
 #include <cstdint>
 #include <functional>
-#include <memory>
 #include <utility>
-#include <vector>
 
-struct Node {
-public:
-    std::vector<std::vector<uint8_t>> m_Keys;
-    std::vector<std::vector<uint8_t>> m_Vals;
-    std::vector<std::unique_ptr<Node>> m_Kids;
+// struct Node {
+// public:
+//     std::vector<std::vector<uint8_t>> m_Keys;
+//     std::vector<std::vector<uint8_t>> m_Vals;
+//     std::vector<std::unique_ptr<Node>> m_Kids;
 
-    ~Node() = default;
-    Node();
-    std::vector<uint8_t> encode();
-    static std::unique_ptr<Node> decode(std::vector<uint8_t> page);
-};
+//     ~Node() = default;
+//     Node();
+//     std::vector<uint8_t> encode();
+//     static std::unique_ptr<Node> decode(std::vector<uint8_t> page);
+// };
 
 struct BTree {
 public:

@@ -145,8 +145,8 @@ void node_append_kv(BNode& new_, uint16_t idx, uint64_t ptr, ByteVecView key, By
     new_.write_le16(pos, static_cast<uint16_t>(key.size()));
     new_.write_le16(pos + 2, static_cast<uint16_t>(val.size()));
 
-    memcpy(&new_.m_Data[pos + 4], key.data(), key.size());
-    memcpy(&new_.m_Data[pos + 4 + key.size()], val.data(), val.size());
+    std::memcpy(&new_.m_Data[pos + 4], key.data(), key.size());
+    std::memcpy(&new_.m_Data[pos + 4 + key.size()], val.data(), val.size());
 
     new_.set_offset(idx + 1, new_.get_offset(idx) + 4 + static_cast<uint16_t>(key.size() + val.size()));
 }
