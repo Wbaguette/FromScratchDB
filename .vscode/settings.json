@@ -8,5 +8,12 @@
     "--clang-tidy",
     "--all-scopes-completion",
     "--header-insertion=iwyu"
-  ]
+  ],
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "xaver.clang-format",
+  "[cpp]": {
+      "editor.defaultFormatter": "xaver.clang-format"
+  },
+  "clang-format.style": "file",
+  "clang-format.fallbackStyle": "Google"
 }

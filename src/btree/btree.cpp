@@ -1,24 +1,17 @@
 #include "btree.h"
-#include "../shared/treesizes.h"
-#include "../utils/bytes.h"
-#include "bnode.h"
+
 #include <cstdint>
 #include <cstring>
 #include <stdexcept>
 #include <utility>
 #include <vector>
 
-// Node::Node() {
-//     static_assert(4 + 8 + 2 + 4 + BTREE_MAX_KEY_SIZE + BTREE_MAX_VAL_SIZE <= BTREE_PAGE_SIZE, "Node size is greater than max btree page size");
-// }
+#include "../shared/treesizes.h"
+#include "../utils/bytes.h"
+#include "bnode.h"
 
-// std::vector<uint8_t> Node::encode() {}
-
-// std::unique_ptr<Node> Node::decode(std::vector<uint8_t> page) {}
-
-
-BTree::BTree(size_t root): m_Root(root) {} 
-BTree::BTree(Callbacks cbks): m_Callbacks(std::move(cbks)) {}
+BTree::BTree(size_t root) : m_Root(root) {}
+BTree::BTree(Callbacks cbks) : m_Callbacks(std::move(cbks)) {}
 
 void BTree::insert(ByteVecView key, ByteVecView val) {
     if (key.size() == 0) {
@@ -40,7 +33,7 @@ void BTree::insert(ByteVecView key, ByteVecView val) {
         m_Root = static_cast<size_t>(m_Callbacks.alloc(root.m_Data));
         return;
     }
-    
+
     BNode node = tree_insert(*this, m_Callbacks.get(m_Root), key, val);
     std::span<const BNode> res = try_split_thrice(node);
     m_Callbacks.del(static_cast<uint64_t>(m_Root));
@@ -99,7 +92,7 @@ BNode tree_insert(BTree& tree, const BNode& node, ByteVecView key, ByteVecView v
             uint64_t k_ptr = node.get_ptr(idx);
             BNode temp(tree.m_Callbacks.get(k_ptr));
             BNode k_node = tree_insert(tree, temp, key, val);
-            
+
             std::span<const BNode> res = try_split_thrice(k_node);
             tree.m_Callbacks.del(k_ptr);
 
@@ -107,19 +100,22 @@ BNode tree_insert(BTree& tree, const BNode& node, ByteVecView key, ByteVecView v
             break;
         }
         default: {
-            throw std::runtime_error("Switch on node btype gave value other than predefined consts");
+            throw std::runtime_error(
+                "Switch on node btype gave value other than predefined consts");
         }
     }
 
     return new_;
 }
 
-void node_replace_kid_n(BTree& tree, BNode& new_, const BNode& old, uint16_t idx, std::span<const BNode> kids) {
+void node_replace_kid_n(BTree& tree, BNode& new_, const BNode& old, uint16_t idx,
+                        std::span<const BNode> kids) {
     auto inc = static_cast<uint16_t>(kids.size());
     new_.set_header(BNODE_NODE, old.nkeys() + inc - 1);
     node_append_range(new_, old, 0, 0, idx);
     for (size_t i = 0; i < inc; i++) {
-        node_append_kv(new_, idx + static_cast<uint16_t>(i), tree.m_Callbacks.alloc(kids[i].m_Data) , kids[i].get_key(0), {});
+        node_append_kv(new_, idx + static_cast<uint16_t>(i), tree.m_Callbacks.alloc(kids[i].m_Data),
+                       kids[i].get_key(0), {});
     }
     node_append_range(new_, old, idx + inc, idx + 1, old.nkeys() - (idx + 1));
 }
@@ -154,36 +150,39 @@ BNode tree_delete_key(BTree& tree, const BNode& node, ByteVecView key) {
             return node_delete_key(tree, node, idx, key);
         }
         default: {
-            throw std::runtime_error("Switch on node btype gave value other than predefined consts");
+            throw std::runtime_error(
+                "Switch on node btype gave value other than predefined consts");
         }
     }
 }
 
-std::pair<int8_t, BNode> should_merge(BTree& tree, const BNode& node, uint16_t idx, const BNode& updated) {
+std::pair<int8_t, BNode> should_merge(BTree& tree, const BNode& node, uint16_t idx,
+                                      const BNode& updated) {
     if (updated.nbytes() > static_cast<uint16_t>(BTREE_PAGE_SIZE) / 4) {
-        return { 0, BNode{} };
+        return {0, BNode{}};
     }
 
     if (idx > 0) {
         BNode sibling(tree.m_Callbacks.get(node.get_ptr(idx - 1)));
         uint16_t merged = sibling.nbytes() + updated.nbytes() - static_cast<uint16_t>(HEADER);
         if (merged <= static_cast<uint16_t>(BTREE_PAGE_SIZE)) {
-            return { -1, sibling };
+            return {-1, sibling};
         }
     }
 
     if (idx + 1 < node.nbytes()) {
         BNode sibling(tree.m_Callbacks.get(node.get_ptr(idx + 1)));
         uint16_t merged = sibling.nbytes() + updated.nbytes() - static_cast<uint16_t>(HEADER);
-        if (merged <= static_cast<uint16_t>(BTREE_PAGE_SIZE)) { 
-            return { 1, sibling };
+        if (merged <= static_cast<uint16_t>(BTREE_PAGE_SIZE)) {
+            return {1, sibling};
         }
     }
 
-    return { 0, BNode{} };
+    return {0, BNode{}};
 }
 
-void node_replace_2_kid(BNode& new_, const BNode& old, uint16_t idx, uint64_t merged, ByteVecView key) {
+void node_replace_2_kid(BNode& new_, const BNode& old, uint16_t idx, uint64_t merged,
+                        ByteVecView key) {
     new_.set_header(BNODE_NODE, old.nkeys() - 1);
     node_append_range(new_, old, 0, 0, idx);
     node_append_kv(new_, idx, merged, key, {});
@@ -205,14 +204,16 @@ BNode node_delete_key(BTree& tree, const BNode& node, uint16_t idx, ByteVecView 
             BNode merged(BTREE_PAGE_SIZE);
             node_merge(merged, sibling, updated);
             tree.m_Callbacks.del(node.get_ptr(idx - 1));
-            node_replace_2_kid(new_, node, idx - 1, tree.m_Callbacks.alloc(merged.m_Data), merged.get_key(0));
+            node_replace_2_kid(new_, node, idx - 1, tree.m_Callbacks.alloc(merged.m_Data),
+                               merged.get_key(0));
             break;
         }
         case 1: {
             BNode merged(BTREE_PAGE_SIZE);
             node_merge(merged, sibling, updated);
             tree.m_Callbacks.del(node.get_ptr(idx + 1));
-            node_replace_2_kid(new_, node, idx - 1, tree.m_Callbacks.alloc(merged.m_Data), merged.get_key(0));
+            node_replace_2_kid(new_, node, idx - 1, tree.m_Callbacks.alloc(merged.m_Data),
+                               merged.get_key(0));
             break;
         }
         case 0: {
@@ -222,7 +223,7 @@ BNode node_delete_key(BTree& tree, const BNode& node, uint16_t idx, ByteVecView 
                 }
                 new_.set_header(BNODE_NODE, 0);
             } else {
-                node_replace_kid_n(tree, new_, node, idx, std::vector<BNode> { updated });                
+                node_replace_kid_n(tree, new_, node, idx, std::vector<BNode>{updated});
             }
             break;
         }

@@ -1,9 +1,10 @@
-#include "btree/bnode.h"
-#include "utils/bytell_hash_map.hpp"
-#include "utils/bytes.h"
 #include <cstdint>
 #include <cstring>
 #include <iostream>
+
+#include "btree/bnode.h"
+#include "utils/bytell_hash_map.hpp"
+#include "utils/bytes.h"
 
 int main() {
     // auto m = ska::bytell_hash_map<int, int>{};
@@ -15,10 +16,9 @@ int main() {
     // if (found == m.end())
     //     std::cout << "Not in map" << std::endl;
 
-
     BNode b;
     b.set_header(BNODE_LEAF, 3);
-    
+
     node_append_kv(b, 0, 0, str_to_byte_vec("k1"), str_to_byte_vec("hi"));
     std::cout << b << "\n";
 
@@ -36,9 +36,4 @@ int main() {
     for (uint8_t c : val) {
         std::cout << static_cast<char>(c);
     }
-    
-    
-    
-
 }
-    
