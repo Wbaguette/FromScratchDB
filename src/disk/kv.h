@@ -1,15 +1,18 @@
 #pragma once
 
-#include "../shared/bytevecview.h"
+#include "../shared/views.h"
 #include "../btree/btree.h"
 #include <filesystem>
 #include <memory>
-
+#include "../freelist/freelist.h"
+#include "../utils/bytell_hash_map.hpp"
 
 struct KV {
 public:
   std::filesystem::path m_Path;
   std::unique_ptr<BTree> m_Tree;
+  std::unique_ptr<FreeList> m_FreeList;
+
   int m_Fd;
   bool failed;
 
@@ -20,8 +23,11 @@ public:
 
   struct {
     uint64_t flushed;
+    uint64_t napppend;
+    std::unique_ptr<ska::bytell_hash_map<uint64_t, ByteVecView>> updates;
     PageView temp;
   } m_Page;
+
 
   // Constructor
   explicit KV();
@@ -41,12 +47,15 @@ public:
   void set(ByteVecView key, ByteVecView val);
   bool del(ByteVecView key);
 
+  ByteVecView page_read_file(uint64_t ptr);
   ByteVecView page_read(uint64_t ptr);
   uint64_t page_append(ByteVecView node_data);
+  uint64_t page_alloc(ByteVecView node_data);
+  ByteVecView page_write(uint64_t ptr);
 
 };
 
-ByteVecView save_meta(KV& db);
+std::array<uint8_t, 32> save_meta(KV& db);
 void load_meta(KV& db, ByteVecView data);
 void read_root(KV& db, size_t file_size);
 void update_root(KV& db);

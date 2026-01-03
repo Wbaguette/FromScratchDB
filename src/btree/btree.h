@@ -1,5 +1,5 @@
 #pragma once
-#include "../shared/bytevecview.h"
+#include "../shared/views.h"
 #include "bnode.h"
 #include <cstdint>
 #include <functional>

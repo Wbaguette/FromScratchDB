@@ -20,13 +20,13 @@ int main() {
     b.set_header(BNODE_LEAF, 3);
     
     node_append_kv(b, 0, 0, str_to_byte_vec("k1"), str_to_byte_vec("hi"));
-    std::cout << b << std::endl;
+    std::cout << b << "\n";
 
     node_append_kv(b, 1, 0, str_to_byte_vec("k2"), str_to_byte_vec("no"));
-    std::cout << b << std::endl;
+    std::cout << b << "\n";
 
     node_append_kv(b, 2, 0, str_to_byte_vec("k3"), str_to_byte_vec("yo"));
-    std::cout << b << std::endl;
+    std::cout << b << "\n";
 
     auto key = b.get_key(1);
     for (uint8_t c : key) {

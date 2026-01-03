@@ -10,9 +10,10 @@ int lex_cmp_byte_vecs(ByteVecView a, ByteVecView b) {
   size_t n = std::min(a.size(), b.size());
   const int rc = std::memcmp(a.data(), b.data(), n);
 
-  if (rc != 0) return rc;
+  if (rc != 0)  { return rc; }
 
-  if (a.size() < b.size()) return -1;
-  if (a.size() > b.size()) return 1;
+  if (a.size() < b.size()) { return -1; }
+  if (a.size() > b.size()) { return 1; }
+
   return 0;
 }

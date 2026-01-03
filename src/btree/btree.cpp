@@ -21,12 +21,15 @@ BTree::BTree(size_t root): m_Root(root) {}
 BTree::BTree(Callbacks cbks): m_Callbacks(std::move(cbks)) {}
 
 void BTree::insert(ByteVecView key, ByteVecView val) {
-    if (key.size() == 0) 
+    if (key.size() == 0) {
         throw std::runtime_error("key is empty");
-    if (key.size() > BTREE_MAX_KEY_SIZE) 
+    }
+    if (key.size() > BTREE_MAX_KEY_SIZE) {
         throw std::runtime_error("key's size is greater than max allowed");
-    if (val.size() > BTREE_MAX_VAL_SIZE) 
+    }
+    if (val.size() > BTREE_MAX_VAL_SIZE) {
         throw std::runtime_error("key's size is greater than max allowed");
+    }
 
     if (m_Root == 0) {
         BNode root(BTREE_PAGE_SIZE);
@@ -57,15 +60,18 @@ void BTree::insert(ByteVecView key, ByteVecView val) {
 }
 
 bool BTree::remove(ByteVecView key) {
-    if (key.size() == 0) 
+    if (key.size() == 0) {
         throw std::length_error("Key to remove has size 0");
-    if (key.size() > BTREE_MAX_KEY_SIZE)
+    }
+    if (key.size() > BTREE_MAX_KEY_SIZE) {
         throw std::length_error("Key to remove has size greater than max allowed");
-    
+    }
+
     BNode updated = tree_delete_key(*this, m_Callbacks.get(m_Root), key);
-    if (updated.m_Data.size() == 0) 
+    if (updated.m_Data.size() == 0) {
         return false;
-    
+    }
+
     m_Callbacks.del(m_Root);
     if (updated.btype() == static_cast<uint16_t>(BNODE_NODE) && updated.nkeys() == 1) {
         m_Root = static_cast<size_t>(updated.get_ptr(0));
@@ -109,7 +115,7 @@ BNode tree_insert(BTree& tree, const BNode& node, ByteVecView key, ByteVecView v
 }
 
 void node_replace_kid_n(BTree& tree, BNode& new_, const BNode& old, uint16_t idx, std::span<const BNode> kids) {
-    uint16_t inc = static_cast<uint16_t>(kids.size());
+    auto inc = static_cast<uint16_t>(kids.size());
     new_.set_header(BNODE_NODE, old.nkeys() + inc - 1);
     node_append_range(new_, old, 0, 0, idx);
     for (size_t i = 0; i < inc; i++) {
@@ -154,22 +160,24 @@ BNode tree_delete_key(BTree& tree, const BNode& node, ByteVecView key) {
 }
 
 std::pair<int8_t, BNode> should_merge(BTree& tree, const BNode& node, uint16_t idx, const BNode& updated) {
-    if (updated.nbytes() > static_cast<uint16_t>(BTREE_PAGE_SIZE) / 4) 
+    if (updated.nbytes() > static_cast<uint16_t>(BTREE_PAGE_SIZE) / 4) {
         return { 0, BNode{} };
-    
+    }
 
     if (idx > 0) {
         BNode sibling(tree.m_Callbacks.get(node.get_ptr(idx - 1)));
         uint16_t merged = sibling.nbytes() + updated.nbytes() - static_cast<uint16_t>(HEADER);
-        if (merged <= static_cast<uint16_t>(BTREE_PAGE_SIZE)) 
+        if (merged <= static_cast<uint16_t>(BTREE_PAGE_SIZE)) {
             return { -1, sibling };
+        }
     }
 
     if (idx + 1 < node.nbytes()) {
         BNode sibling(tree.m_Callbacks.get(node.get_ptr(idx + 1)));
         uint16_t merged = sibling.nbytes() + updated.nbytes() - static_cast<uint16_t>(HEADER);
-        if (merged <= static_cast<uint16_t>(BTREE_PAGE_SIZE)) 
+        if (merged <= static_cast<uint16_t>(BTREE_PAGE_SIZE)) { 
             return { 1, sibling };
+        }
     }
 
     return { 0, BNode{} };

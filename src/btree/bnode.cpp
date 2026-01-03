@@ -14,7 +14,7 @@ BNode::BNode(size_t size): m_Data(size) {}
 BNode::BNode(ByteVecView data): m_Data(data.begin(), data.end()) {}
 
 std::ostream& operator<<(std::ostream& os, const BNode& b_node) {
-    os << "BNode { " << std::endl; 
+    os << "BNode { " << "\n"; 
     std::string_view bnode_type;
     if (b_node.btype() == 1) {
         bnode_type = "node(1)";
@@ -22,30 +22,32 @@ std::ostream& operator<<(std::ostream& os, const BNode& b_node) {
         bnode_type = "leaf(2)";
     }
 
-    os << " btype=" << bnode_type << std::endl
-       << " nkeys=" << b_node.nkeys() << std::endl
-       << " m_Data_vec_size=" << b_node.m_Data.size() << std::endl
-       << " m_Data_vec_capacity=" << b_node.m_Data.capacity() << std::endl;
+    os << " btype=" << bnode_type << "\n"
+       << " nkeys=" << b_node.nkeys() << "\n"
+       << " m_Data_vec_size=" << b_node.m_Data.size() << "\n"
+       << " m_Data_vec_capacity=" << b_node.m_Data.capacity() << "\n";
     
     os << " m_Data=[ ";
     for (uint8_t c : b_node.m_Data) {
         os << static_cast<char>(c);
     }
-    os << "]" << std::endl;
-    os << "}" << std::endl;
+    os << "]" << "\n";
+    os << "}" << "\n";
     
     return os;
 }
 
 uint16_t BNode::btype() const {
-    if (m_Data.size() < 2)
+    if (m_Data.size() < 2) {
         throw std::out_of_range("BNode m_Data too small to have btype");
+    }
     return read_le16(0);
 }
 
 uint16_t BNode::nkeys() const {
-    if (m_Data.size() < 4)
+    if (m_Data.size() < 4) {
         throw std::out_of_range("BNode m_Data too small to have nkeys");
+    }
     return read_le16(2);    
 }
 
@@ -54,18 +56,21 @@ uint16_t BNode::nbytes() const {
 }
 
 uint64_t BNode::get_ptr(uint16_t idx) const {
-    if (idx >= nkeys()) 
+    if (idx >= nkeys()) {
         throw std::out_of_range("child pointer idx is greater than number of keys");
+    }
 
-    size_t pos = 4 + 8 * static_cast<size_t>(idx); // Position of child pointer is 4 bytes (header) + 8 * position (each child pointer is 8 bytes on 64bit arch)
+    // Position of child pointer is 4 bytes (header) + 8 * position (each child pointer is 8 bytes on 64bit arch)
+    size_t pos = 4 + (8 * static_cast<size_t>(idx)); 
     return read_le64(pos);
 }
 
 void BNode::set_ptr(uint16_t idx, uint64_t val) {
-    if (idx >= nkeys()) 
+    if (idx >= nkeys()) {
         throw std::out_of_range("child pointer idx is greater than number of keys");
+    }
 
-    size_t pos = 4 + 8 * static_cast<size_t>(idx); // Position of child pointer is 4 bytes (header) + 8 * position (each child pointer is 8 bytes on 64bit arch)
+    size_t pos = 4 + (8 * static_cast<size_t>(idx)); // Position of child pointer is 4 bytes (header) + 8 * position (each child pointer is 8 bytes on 64bit arch)
     write_le64(pos, val);
 }
 

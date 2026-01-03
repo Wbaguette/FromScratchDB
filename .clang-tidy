@@ -1,0 +1,29 @@
+Checks: >
+  clang-analyzer-*,
+  bugprone-*,
+  misc-*,
+  modernize-*,
+  performance-*,
+  portability-*,
+  readability-*,
+  -bugprone-branch-clone,
+  -bugprone-easily-swappable-parameters,
+  -readability-function-cognitive-complexity,
+  -readability-identifier-length,
+  -modernize-use-trailing-return-type,
+  -readability-magic-numbers, #
+  -cppcoreguidelines-avoid-magic-numbers, # 
+  -misc-non-private-member-variables-in-classes  
+  
+  
+WarningsAsErrors: '*'
+CheckOptions:
+  - key: bugprone-dangling-handle.CheckBindTemporary
+    value: 'true'
+  - key: bugprone-dangling-handle.Aggressive
+    value: 'true'
+  - key: misc-non-private-member-variables-in-classes.IgnoreClassesWithAllMemberVariablesBeingPublic
+    value: 'true'
+  
+HeaderFilterRegex: '.*'
+FormatStyle: file

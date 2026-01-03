@@ -1,6 +1,6 @@
 #pragma once
 #include "../shared/treesizes.h"
-#include "../shared/bytevecview.h"
+#include "../shared/views.h"
 #include <cstdint>
 #include <ostream>
 #include <vector>
