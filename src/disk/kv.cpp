@@ -15,6 +15,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 #include <stdexcept>
 #include <vector>
 
@@ -110,6 +111,9 @@ int update_file(KV& db) {
     if (res2 == -1) {
         return res1;
     }
+
+    db.m_FreeList->set_max_seq();
+    return 0;
 }
 
 int create_file_sync(const std::filesystem::path& file) {
@@ -162,8 +166,6 @@ void extend_mmap(KV& db, int size) {
     db.m_Mmap.chunks.push_back(chunk_data);
 }
 
-KV::KV() {}
-
 void KV::open() {
     m_Tree->m_Callbacks.get = [this](uint64_t ptr) { return page_read(ptr); };
     m_Tree->m_Callbacks.alloc = [this](ByteVecView node_data) { return page_alloc(node_data); };
@@ -202,13 +204,20 @@ ByteVecView KV::page_read(uint64_t ptr) {
 
 ByteVecView KV::page_read_file(uint64_t ptr) {
     uint64_t start = 0;
-    for (size_t i = 0; i < m_Mmap.chunks.size(); i++) {
-        uint64_t end = start + static_cast<uint64_t>(m_Mmap.chunks[i].size()) /
-                                   static_cast<uint64_t>(BTREE_PAGE_SIZE);
+    for (auto chunk : m_Mmap.chunks) {
+        uint64_t end =
+            start + (static_cast<uint64_t>(chunk.size()) / static_cast<uint64_t>(BTREE_PAGE_SIZE));
         if (ptr < end) {
-            uint64_t offset = static_cast<uint64_t>(BTREE_PAGE_SIZE) * (ptr - start);
-            return std::vector<uint8_t>(m_Mmap.chunks[i].begin() + offset,
-                                        m_Mmap.chunks[i].begin() + offset + BTREE_PAGE_SIZE);
+            uint64_t page_index = ptr - start;
+            uint64_t unsigned_offset = page_index * static_cast<uint64_t>(BTREE_PAGE_SIZE);
+
+            if (unsigned_offset >
+                static_cast<uint64_t>(std::numeric_limits<std::ptrdiff_t>::max())) {
+                throw std::overflow_error("Offset too large for iterator arithmetic");
+            }
+
+            auto offset = static_cast<std::ptrdiff_t>(unsigned_offset);
+            return {chunk.begin() + offset, chunk.begin() + offset + BTREE_PAGE_SIZE};
         }
         start = end;
     }
@@ -236,11 +245,11 @@ std::vector<uint8_t> KV::page_write(uint64_t ptr) {
         return {val.begin(), val.end()};
     }
 
-    std::vector<uint8_t> node;
-    node.reserve(BTREE_PAGE_SIZE);
+    std::vector<uint8_t> node(BTREE_PAGE_SIZE);
 
     ByteVecView data = page_read_file(ptr);
-    std::memcpy(node.data(), data.data(), data.size());
+    std::memcpy(node.data(), data.data(),
+                std::min(data.size(), static_cast<size_t>(BTREE_PAGE_SIZE)));
     m_Page.updates->emplace(ptr, node);
 
     return node;

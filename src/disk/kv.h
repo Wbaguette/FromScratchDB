@@ -29,7 +29,7 @@ struct KV {
     } m_Page;
 
     // Constructor
-    explicit KV();
+    explicit KV() = default;
     // Copy constructor
     KV(const KV& other) = delete;
     // Destructor
