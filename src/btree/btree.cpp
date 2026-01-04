@@ -1,5 +1,6 @@
 #include "btree.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <stdexcept>
@@ -35,7 +36,7 @@ void BTree::insert(ByteVecView key, ByteVecView val) {
     }
 
     BNode node = tree_insert(*this, m_Callbacks.get(m_Root), key, val);
-    std::span<const BNode> res = try_split_thrice(node);
+    std::vector<BNode> res = try_split_thrice(node);
     m_Callbacks.del(static_cast<uint64_t>(m_Root));
 
     if (res.size() > 1) {
@@ -76,7 +77,7 @@ bool BTree::remove(ByteVecView key) {
 }
 
 BNode tree_insert(BTree& tree, const BNode& node, ByteVecView key, ByteVecView val) {
-    BNode new_(2 * BTREE_PAGE_SIZE);
+    BNode new_(static_cast<size_t>(2 * BTREE_PAGE_SIZE));
 
     uint16_t idx = lookup_le_pos(node, key);
     switch (node.btype()) {
@@ -93,7 +94,7 @@ BNode tree_insert(BTree& tree, const BNode& node, ByteVecView key, ByteVecView v
             BNode temp(tree.m_Callbacks.get(k_ptr));
             BNode k_node = tree_insert(tree, temp, key, val);
 
-            std::span<const BNode> res = try_split_thrice(k_node);
+            std::vector<BNode> res = try_split_thrice(k_node);
             tree.m_Callbacks.del(k_ptr);
 
             node_replace_kid_n(tree, new_, node, idx, res);

@@ -35,7 +35,7 @@ struct BNode {
     [[nodiscard]] uint64_t get_ptr(uint16_t idx) const;
     void set_ptr(uint16_t idx, uint64_t val);
     [[nodiscard]] uint16_t get_offset(uint16_t idx) const;
-    void set_offset(uint16_t idx, uint16_t offset);
+    void set_offset(uint16_t idx, uint16_t offset_val);
     [[nodiscard]] uint16_t kv_pos(uint16_t idx) const;
     [[nodiscard]] ByteVecView get_key(uint16_t idx) const;
     [[nodiscard]] ByteVecView get_val(uint16_t idx) const;
@@ -70,7 +70,7 @@ struct BNode {
 };
 
 void node_append_kv(BNode& new_, uint16_t idx, uint64_t ptr, ByteVecView key, ByteVecView val);
-std::span<const BNode> try_split_thrice(BNode& old);
+std::vector<BNode> try_split_thrice(BNode& old);
 void split_half(BNode& left, BNode& right, const BNode& old);
 uint16_t lookup_le_pos(const BNode& node, ByteVecView key);
 void node_append_range(BNode& new_, const BNode& old, uint16_t dst_new, uint16_t src_old,

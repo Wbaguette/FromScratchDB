@@ -87,7 +87,7 @@ uint16_t BNode::get_offset(uint16_t idx) const {
     return read_le16(pos);
 }
 
-void BNode::set_offset(uint16_t idx, uint16_t offset) {
+void BNode::set_offset(uint16_t idx, uint16_t offset_val) {
     if (idx > nkeys()) {
         throw std::out_of_range("offset pos idx is greater than number of keys");
     }
@@ -95,8 +95,8 @@ void BNode::set_offset(uint16_t idx, uint16_t offset) {
         throw std::out_of_range("offset pos idx cannot be 0");
     }
 
-    size_t pos = 4 + (8 * static_cast<size_t>(nkeys())) + (2 * (static_cast<size_t>(idx) - 1));
-    write_le16(pos, offset);
+    size_t offset_pos = 4 + (8 * static_cast<size_t>(nkeys())) + (2 * (static_cast<size_t>(idx) - 1));
+    write_le16(offset_pos, offset_val);
 }
 
 uint16_t BNode::kv_pos(uint16_t idx) const {
@@ -234,13 +234,13 @@ void split_half(BNode& left, BNode& right, const BNode& old) {
     }
 }
 
-std::span<const BNode> try_split_thrice(BNode& old) {
+std::vector<BNode> try_split_thrice(BNode& old) {
     if (old.nbytes() <= static_cast<uint16_t>(BTREE_PAGE_SIZE)) {
         old.m_Data.resize(BTREE_PAGE_SIZE);
         return std::vector<BNode>{old};
     }
 
-    BNode left(2 * BTREE_PAGE_SIZE);
+    BNode left(static_cast<size_t>(2 * BTREE_PAGE_SIZE));
     BNode right;
     split_half(left, right, old);
     if (left.nbytes() <= static_cast<uint16_t>(BTREE_PAGE_SIZE)) {
