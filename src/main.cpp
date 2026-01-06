@@ -6,7 +6,6 @@
 #include <cstdint>
 #include <cstring>
 #include <exception>
-#include <filesystem>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -15,20 +14,14 @@
 #include "utils/bytes.h"
 
 int main() {
-    std::cout << "Simple Database Example\n";
-    std::cout << "=======================\n\n";
-
     try {
         const std::string db_path = "test.fsdb";
-        std::filesystem::remove(db_path);
 
-        // Create and initialize the database
         KV db(db_path);
         db.init();
 
         std::cout << "Database opened: " << db_path << "\n\n";
 
-        // Insert some data
         std::cout << "Inserting data...\n";
         db.set(str_to_byte_vec("name"), str_to_byte_vec("Alice"));
         db.set(str_to_byte_vec("age"), str_to_byte_vec("25"));
@@ -43,19 +36,25 @@ int main() {
 
         if (!name.empty()) {
             std::cout << "  name: ";
-            for (uint8_t c : name) std::cout << static_cast<char>(c);
+            for (uint8_t c : name) {
+                std::cout << static_cast<char>(c);
+            }
             std::cout << "\n";
         }
 
         if (!age.empty()) {
             std::cout << "  age: ";
-            for (uint8_t c : age) std::cout << static_cast<char>(c);
+            for (uint8_t c : age) {
+                std::cout << static_cast<char>(c);
+            }
             std::cout << "\n";
         }
 
         if (!city.empty()) {
             std::cout << "  city: ";
-            for (uint8_t c : city) std::cout << static_cast<char>(c);
+            for (uint8_t c : city) {
+                std::cout << static_cast<char>(c);
+            }
             std::cout << "\n";
         }
 
@@ -66,7 +65,9 @@ int main() {
         auto updated_age = db.get(str_to_byte_vec("age"));
         if (!updated_age.empty()) {
             std::cout << "  new age: ";
-            for (uint8_t c : updated_age) std::cout << static_cast<char>(c);
+            for (uint8_t c : updated_age) {
+                std::cout << static_cast<char>(c);
+            }
             std::cout << "\n";
         }
 
@@ -81,6 +82,6 @@ int main() {
         close(db.m_Fd);
         std::cout << "\nDatabase closed successfully!\n";
     } catch (std::exception& e) {
-        throw e;
+        std::cout << e.what();
     }
 }

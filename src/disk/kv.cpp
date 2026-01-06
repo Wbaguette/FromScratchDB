@@ -23,6 +23,9 @@
 
 constexpr std::string DB_SIG = "bigchungus";
 
+KV::Page::Page(std::unique_ptr<ska::bytell_hash_map<uint64_t, ByteVecView>> updates)
+    : flushed(0), napppend(0), updates(std::move(updates)) {}
+
 // | sig | root_ptr | page_used |
 // | 16B |    8B    |     8B    |
 std::array<uint8_t, 32> save_meta(KV& db) {
