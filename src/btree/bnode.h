@@ -71,7 +71,7 @@ struct BNode {
 
 void node_append_kv(BNode& new_, uint16_t idx, uint64_t ptr, ByteVecView key, ByteVecView val);
 std::vector<BNode> try_split_thrice(BNode& old);
-void split_half(BNode& left, BNode& right, const BNode& old);
+void split_half(BNode& l, BNode& r, const BNode& old);
 uint16_t lookup_le_pos(const BNode& node, ByteVecView key);
 void node_append_range(BNode& new_, const BNode& old, uint16_t dst_new, uint16_t src_old,
                        uint16_t n);

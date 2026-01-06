@@ -76,6 +76,39 @@ bool BTree::remove(ByteVecView key) {
     return true;
 }
 
+std::vector<uint8_t> BTree::get(ByteVecView key) const {
+    if (key.size() == 0) {
+        return {};
+    }
+    if (key.size() > BTREE_MAX_KEY_SIZE) {
+        return {};
+    }
+
+    if (m_Root == 0) {
+        return {};
+    }
+
+    BNode node(m_Callbacks.get(m_Root));
+    while (true) {
+        uint16_t idx = lookup_le_pos(node, key);
+
+        if (node.btype() == BNODE_LEAF) {
+            if (lex_cmp_byte_vecs(key, node.get_key(idx)) == 0) {
+                ByteVecView val = node.get_val(idx);
+                return {val.begin(), val.end()};
+            }
+            return {};
+        }
+
+        if (node.btype() == BNODE_NODE) {
+            uint64_t ptr = node.get_ptr(idx);
+            node = BNode(m_Callbacks.get(ptr));
+        } else {
+            return {};
+        }
+    }
+}
+
 BNode tree_insert(BTree& tree, const BNode& node, ByteVecView key, ByteVecView val) {
     BNode new_(static_cast<size_t>(2 * BTREE_PAGE_SIZE));
 
@@ -171,7 +204,7 @@ std::pair<int8_t, BNode> should_merge(BTree& tree, const BNode& node, uint16_t i
         }
     }
 
-    if (idx + 1 < node.nbytes()) {
+    if (idx + 1 < node.nkeys()) {
         BNode sibling(tree.m_Callbacks.get(node.get_ptr(idx + 1)));
         uint16_t merged = sibling.nbytes() + updated.nbytes() - static_cast<uint16_t>(HEADER);
         if (merged <= static_cast<uint16_t>(BTREE_PAGE_SIZE)) {

@@ -30,9 +30,10 @@ struct BTree {
     BTree& operator=(BTree&& other) noexcept = default;
     void insert(ByteVecView key, ByteVecView val);
     bool remove(ByteVecView key);
+    [[nodiscard]] std::vector<uint8_t> get(ByteVecView key) const;
 };
 
-BNode tree_insert(BTree& tree, const BNode& node, ByteVecView key, ByteVecView data);
+BNode tree_insert(BTree& tree, const BNode& node, ByteVecView key, ByteVecView val);
 void node_replace_kid_n(BTree& tree, BNode& new_, const BNode& old, uint16_t idx,
                         std::span<const BNode> kids);
 void node_merge(BNode& new_, BNode& left, BNode& right);

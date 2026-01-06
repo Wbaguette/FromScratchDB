@@ -1,9 +1,38 @@
 #include "freelist.h"
 
 #include <cstdint>
+#include <cstring>
 #include <vector>
 
 LNode::LNode(ByteVecView data) { m_Data = std::vector<uint8_t>(data.begin(), data.end()); }
+
+uint64_t LNode::get_next() {
+    uint64_t v;
+    std::memcpy(&v, m_Data.data(), sizeof(v));
+    return v;
+}
+
+void LNode::set_next(uint64_t next) { std::memcpy(m_Data.data(), &next, sizeof(next)); }
+
+uint64_t LNode::get_ptr(size_t idx) {
+    if (idx >= FREE_LIST_CAP) {
+        return 0;
+    }
+    uint64_t v;
+    size_t offset = FREE_LIST_HEADER + (idx * sizeof(uint64_t));
+    std::memcpy(&v, &m_Data[offset], sizeof(v));
+    return v;
+}
+
+void LNode::set_ptr(size_t idx, uint64_t ptr) {
+    if (idx >= FREE_LIST_CAP) {
+        return;
+    }
+    size_t offset = FREE_LIST_HEADER + (idx * sizeof(uint64_t));
+    std::memcpy(&m_Data[offset], &ptr, sizeof(ptr));
+}
+
+FreeList::FreeList() : head_page(0), head_seq(0), tail_page(0), tail_seq(0), max_seq(0) {}
 
 uint64_t FreeList::pop_head() {
     auto [ptr, head] = fl_pop(*this);

@@ -187,7 +187,7 @@ uint16_t lookup_le_pos(const BNode& node, ByteVecView key) {
     return static_cast<uint16_t>(i) - 1;
 }
 
-void split_half(BNode& left, BNode& right, const BNode& old) {
+void split_half(BNode& l, BNode& r, const BNode& old) {
     if (old.nkeys() < 2) {
         throw std::out_of_range("Too little keys to split into two");
     }
@@ -221,15 +221,15 @@ void split_half(BNode& left, BNode& right, const BNode& old) {
 
     size_t n_right = static_cast<size_t>(old.nkeys()) - n_left;
 
-    left.m_Data.clear();
-    left.set_header(old.btype(), static_cast<uint16_t>(n_left));
-    node_append_range(left, old, 0, 0, static_cast<uint16_t>(n_left));
+    l.m_Data.clear();
+    l.set_header(old.btype(), static_cast<uint16_t>(n_left));
+    node_append_range(l, old, 0, 0, static_cast<uint16_t>(n_left));
 
-    right.m_Data.clear();
-    right.set_header(old.btype(), static_cast<uint16_t>(n_right));
-    node_append_range(right, old, 0, static_cast<uint16_t>(n_left), static_cast<uint16_t>(n_right));
+    r.m_Data.clear();
+    r.set_header(old.btype(), static_cast<uint16_t>(n_right));
+    node_append_range(r, old, 0, static_cast<uint16_t>(n_left), static_cast<uint16_t>(n_right));
 
-    if (right.nbytes() > static_cast<uint16_t>(BTREE_PAGE_SIZE)) {
+    if (r.nbytes() > static_cast<uint16_t>(BTREE_PAGE_SIZE)) {
         throw std::length_error("Right BNode bytes size exceed max BTREE_PAGE_SIZE");
     }
 }

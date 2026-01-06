@@ -1,5 +1,7 @@
 #pragma once
 
+#include <fcntl.h>
+
 #include <filesystem>
 #include <memory>
 
@@ -21,15 +23,17 @@ struct KV {
         MmapView chunks;
     } m_Mmap;
 
-    struct {
+    struct Page {
         uint64_t flushed;
         uint64_t napppend;
         std::unique_ptr<ska::bytell_hash_map<uint64_t, ByteVecView>> updates;
         PageView temp;
+
+        explicit Page(std::unique_ptr<ska::bytell_hash_map<uint64_t, ByteVecView>> updates);
     } m_Page;
 
     // Constructor
-    explicit KV() = default;
+    explicit KV(const std::string& path);
     // Copy constructor
     KV(const KV& other) = delete;
     // Destructor
@@ -41,8 +45,8 @@ struct KV {
     // Move assignment
     KV& operator=(KV&& other) noexcept = default;
 
-    void open();
-    void get(ByteVecView key);
+    void init();
+    [[nodiscard]] std::vector<uint8_t> get(ByteVecView key) const;
     void set(ByteVecView key, ByteVecView val);
     bool del(ByteVecView key);
 
@@ -60,4 +64,4 @@ void update_root(KV& db);
 void write_pages(KV& db);
 int update_file(KV& db);
 int create_file_sync(const std::filesystem::path& file);
-void extend_mmap(KV& db, int size);
+void extend_mmap(KV& db, size_t size);

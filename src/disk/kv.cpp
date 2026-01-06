@@ -19,6 +19,8 @@
 #include <stdexcept>
 #include <vector>
 
+#include "../shared/treesizes.h"
+
 constexpr std::string DB_SIG = "bigchungus";
 
 // | sig | root_ptr | page_used |
@@ -36,19 +38,27 @@ std::array<uint8_t, 32> save_meta(KV& db) {
 }
 
 void load_meta(KV& db, ByteVecView data) {
-    // TODO
+    // Read root pointer from bytes 16-23
+    std::memcpy(&db.m_Tree->m_Root, &data[16], sizeof(db.m_Tree->m_Root));
+    // Read flushed page count from bytes 24-31
+    std::memcpy(&db.m_Page.flushed, &data[24], sizeof(db.m_Page.flushed));
 }
 
 void read_root(KV& db, size_t file_size) {
     if (file_size == 0) {
-        db.m_Page.flushed = 1;
+        db.m_Page.flushed = 2;
+        db.m_FreeList->head_page = 1;
+        db.m_FreeList->tail_page = 1;
+        db.m_FreeList->head_seq = 0;
+        db.m_FreeList->tail_seq = 0;
+        db.m_FreeList->max_seq = 0;
         return;
     }
 
     ByteVecView data = db.m_Mmap.chunks[0];
     load_meta(db, data);
 
-    // TODO
+    // TODO: Load freelist metadata from page 1 if needed
 }
 
 void update_root(KV& db) {
@@ -65,7 +75,7 @@ void update_root(KV& db) {
 }
 
 void write_pages(KV& db) {
-    int size = (static_cast<int>(db.m_Page.flushed) + db.m_Page.temp.size()) * BTREE_PAGE_SIZE;
+    auto size = static_cast<size_t>((db.m_Page.flushed + db.m_Page.temp.size()) * BTREE_PAGE_SIZE);
     extend_mmap(db, size);
 
     std::vector<iovec> iov(db.m_Page.temp.size());
@@ -94,6 +104,7 @@ void update_or_revert(KV& db, ByteVecView meta) {
     if (status == -1) {
         load_meta(db, meta);
         db.m_Page.temp.clear();
+        db.failed = true;
     }
 }
 
@@ -143,7 +154,7 @@ int create_file_sync(const std::filesystem::path& file) {
     return fd;
 }
 
-void extend_mmap(KV& db, int size) {
+void extend_mmap(KV& db, size_t size) {
     if (size <= db.m_Mmap.total) {
         return;
     }
@@ -166,7 +177,32 @@ void extend_mmap(KV& db, int size) {
     db.m_Mmap.chunks.push_back(chunk_data);
 }
 
-void KV::open() {
+KV::KV(const std::string& path)
+    : m_Path(path),
+      m_Tree(std::make_unique<BTree>(0)),
+      m_FreeList(std::make_unique<FreeList>()),
+      m_Page{std::make_unique<ska::bytell_hash_map<uint64_t, ByteVecView>>()} {
+    std::filesystem::remove(path);
+
+    mode_t mode = 0644;
+    int flags = O_RDWR | O_CREAT;
+    auto fd = open(path.c_str(), flags, mode);
+    if (fd == -1) {
+        throw std::runtime_error("Failed to open database file");
+    }
+
+    m_Fd = fd;
+
+    struct stat st;
+    fstat(m_Fd, &st);
+    if (st.st_size > 0) {
+        extend_mmap(*this, static_cast<size_t>(st.st_size));
+    }
+
+    read_root(*this, static_cast<size_t>(st.st_size));
+}
+
+void KV::init() {
     m_Tree->m_Callbacks.get = [this](uint64_t ptr) { return page_read(ptr); };
     m_Tree->m_Callbacks.alloc = [this](ByteVecView node_data) { return page_alloc(node_data); };
     m_Tree->m_Callbacks.del = [this](uint64_t ptr) { m_FreeList->push_tail(ptr); };
@@ -178,9 +214,7 @@ void KV::open() {
     m_FreeList->m_Callbacks.set = [this](uint64_t ptr) { return page_write(ptr); };
 }
 
-void KV::get(ByteVecView key) {
-    // m_Tree->m_Callbacks.get(key);
-}
+std::vector<uint8_t> KV::get(ByteVecView key) const { return m_Tree->get(key); }
 
 void KV::set(ByteVecView key, ByteVecView val) {
     ByteVecView meta = save_meta(*this);

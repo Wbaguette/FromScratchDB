@@ -1,39 +1,86 @@
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
 #include <cstdint>
 #include <cstring>
+#include <exception>
+#include <filesystem>
 #include <iostream>
+#include <string>
+#include <vector>
 
-#include "btree/bnode.h"
-#include "utils/bytell_hash_map.hpp"
+#include "disk/kv.h"
 #include "utils/bytes.h"
 
 int main() {
-    // auto m = ska::bytell_hash_map<int, int>{};
+    std::cout << "Simple Database Example\n";
+    std::cout << "=======================\n\n";
 
-    // m.emplace(1, 10);
+    try {
+        const std::string db_path = "test.fsdb";
+        std::filesystem::remove(db_path);
 
-    // // auto x = m.at(2);
-    // auto found = m.find(1);
-    // if (found == m.end())
-    //     std::cout << "Not in map" << std::endl;
+        // Create and initialize the database
+        KV db(db_path);
+        db.init();
 
-    BNode b;
-    b.set_header(BNODE_LEAF, 3);
+        std::cout << "Database opened: " << db_path << "\n\n";
 
-    node_append_kv(b, 0, 0, str_to_byte_vec("k1"), str_to_byte_vec("hi"));
-    std::cout << b << "\n";
+        // Insert some data
+        std::cout << "Inserting data...\n";
+        db.set(str_to_byte_vec("name"), str_to_byte_vec("Alice"));
+        db.set(str_to_byte_vec("age"), str_to_byte_vec("25"));
+        db.set(str_to_byte_vec("city"), str_to_byte_vec("Boston"));
+        std::cout << "  Inserted 3 key-value pairs\n\n";
 
-    node_append_kv(b, 1, 0, str_to_byte_vec("k2"), str_to_byte_vec("no"));
-    std::cout << b << "\n";
+        // Retrieve and display data
+        std::cout << "Reading data...\n";
+        auto name = db.get(str_to_byte_vec("name"));
+        auto age = db.get(str_to_byte_vec("age"));
+        auto city = db.get(str_to_byte_vec("city"));
 
-    node_append_kv(b, 2, 0, str_to_byte_vec("k3"), str_to_byte_vec("yo"));
-    std::cout << b << "\n";
+        if (!name.empty()) {
+            std::cout << "  name: ";
+            for (uint8_t c : name) std::cout << static_cast<char>(c);
+            std::cout << "\n";
+        }
 
-    auto key = b.get_key(1);
-    for (uint8_t c : key) {
-        std::cout << static_cast<char>(c);
-    }
-    auto val = b.get_val(1);
-    for (uint8_t c : val) {
-        std::cout << static_cast<char>(c);
+        if (!age.empty()) {
+            std::cout << "  age: ";
+            for (uint8_t c : age) std::cout << static_cast<char>(c);
+            std::cout << "\n";
+        }
+
+        if (!city.empty()) {
+            std::cout << "  city: ";
+            for (uint8_t c : city) std::cout << static_cast<char>(c);
+            std::cout << "\n";
+        }
+
+        // Update a value
+        std::cout << "\nUpdating age to 26...\n";
+        db.set(str_to_byte_vec("age"), str_to_byte_vec("26"));
+
+        auto updated_age = db.get(str_to_byte_vec("age"));
+        if (!updated_age.empty()) {
+            std::cout << "  new age: ";
+            for (uint8_t c : updated_age) std::cout << static_cast<char>(c);
+            std::cout << "\n";
+        }
+
+        // Delete a key
+        std::cout << "\nDeleting city...\n";
+        bool deleted = db.del(str_to_byte_vec("city"));
+        std::cout << "  Delete " << (deleted ? "successful" : "failed") << "\n";
+
+        auto check = db.get(str_to_byte_vec("city"));
+        std::cout << "  city is " << (check.empty() ? "gone" : "still there") << "\n";
+
+        close(db.m_Fd);
+        std::cout << "\nDatabase closed successfully!\n";
+    } catch (std::exception& e) {
+        throw e;
     }
 }
