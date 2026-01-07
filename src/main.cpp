@@ -4,6 +4,7 @@
 #include <unistd.h>
 
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <exception>
 #include <iostream>
@@ -24,9 +25,14 @@ int main() {
 
         std::cout << "Inserting data...\n";
         db.set(str_to_byte_vec("name"), str_to_byte_vec("Alice"));
+        std::cout << "inserted kv 1\n";
+
+        // TODO: getting 'bad ptr' when inserting a second key
         db.set(str_to_byte_vec("age"), str_to_byte_vec("25"));
-        db.set(str_to_byte_vec("city"), str_to_byte_vec("Boston"));
+        // db.set(str_to_byte_vec("city"), str_to_byte_vec("Boston"));
         std::cout << "  Inserted 3 key-value pairs\n\n";
+
+        exit(0);
 
         // Retrieve and display data
         std::cout << "Reading data...\n";

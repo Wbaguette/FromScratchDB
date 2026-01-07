@@ -15,11 +15,30 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <iostream>
 #include <limits>
 #include <stdexcept>
 #include <vector>
 
 #include "../shared/treesizes.h"
+#include "../utils/bytes.h"
+
+namespace {
+void update_or_revert(KV& db, ByteVecView meta) {
+    if (db.failed) {
+        db.failed = false;
+    }
+
+    int status = update_file(db);
+
+    if (status == -1) {
+        load_meta(db, meta);
+        db.m_Page.temp.clear();
+        db.m_Page.updates->clear();
+        db.failed = true;
+    }
+}
+}  // namespace
 
 constexpr std::string DB_SIG = "bigchungus";
 
@@ -30,12 +49,12 @@ KV::Page::Page(std::unique_ptr<ska::bytell_hash_map<uint64_t, ByteVecView>> upda
 // | 16B |    8B    |     8B    |
 std::array<uint8_t, 32> save_meta(KV& db) {
     std::array<uint8_t, 32> data;
+    data.fill(0xFF);
     size_t len = std::min(static_cast<int>(DB_SIG.size()), 16);
 
     std::memcpy(data.data(), DB_SIG.c_str(), len);
-
-    std::memcpy(&data[16], &db.m_Tree->m_Root, sizeof(db.m_Tree->m_Root));
-    std::memcpy(&data[24], &db.m_Page.flushed, sizeof(db.m_Page.flushed));
+    std::memcpy(data.data() + 16, &db.m_Tree->m_Root, sizeof(db.m_Tree->m_Root));
+    std::memcpy(data.data() + 24, &db.m_Page.flushed, sizeof(db.m_Page.flushed));
 
     return data;
 }
@@ -97,20 +116,6 @@ void write_pages(KV& db) {
     db.m_Page.temp.clear();
 }
 
-void update_or_revert(KV& db, ByteVecView meta) {
-    if (db.failed) {
-        // TODO
-        db.failed = false;
-    }
-
-    int status = update_file(db);
-    if (status == -1) {
-        load_meta(db, meta);
-        db.m_Page.temp.clear();
-        db.failed = true;
-    }
-}
-
 int update_file(KV& db) {
     write_pages(db);
 
@@ -123,7 +128,7 @@ int update_file(KV& db) {
 
     int res2 = fsync(db.m_Fd);
     if (res2 == -1) {
-        return res1;
+        return res2;
     }
 
     db.m_FreeList->set_max_seq();
@@ -177,7 +182,7 @@ void extend_mmap(KV& db, size_t size) {
     db.m_Mmap.total += alloc;
 
     ByteVecView chunk_data(static_cast<uint8_t*>(chunk), alloc);
-    db.m_Mmap.chunks.push_back(chunk_data);
+    db.m_Mmap.chunks.emplace_back(chunk_data);
 }
 
 KV::KV(const std::string& path)
@@ -220,7 +225,8 @@ void KV::init() {
 std::vector<uint8_t> KV::get(ByteVecView key) const { return m_Tree->get(key); }
 
 void KV::set(ByteVecView key, ByteVecView val) {
-    ByteVecView meta = save_meta(*this);
+    std::array<uint8_t, 32> meta = save_meta(*this);
+
     m_Tree->insert(key, val);
     update_or_revert(*this, meta);
 }
@@ -263,7 +269,7 @@ ByteVecView KV::page_read_file(uint64_t ptr) {
 
 uint64_t KV::page_append(ByteVecView node_data) {
     uint64_t ptr = m_Page.flushed + static_cast<uint64_t>(m_Page.temp.size());
-    m_Page.temp.push_back(node_data);
+    m_Page.temp.emplace_back(node_data);
     return ptr;
 }
 

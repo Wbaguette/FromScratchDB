@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <iostream>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -31,6 +32,7 @@ void BTree::insert(ByteVecView key, ByteVecView val) {
 
         node_append_kv(root, 0, 0, {}, {});
         node_append_kv(root, 1, 0, key, val);
+
         m_Root = static_cast<size_t>(m_Callbacks.alloc(root.m_Data));
         return;
     }
