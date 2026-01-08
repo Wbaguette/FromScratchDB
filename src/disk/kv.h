@@ -16,20 +16,24 @@ struct KV {
     std::unique_ptr<FreeList> m_FreeList;
 
     int m_Fd;
-    bool failed;
+    bool m_Failed;
 
-    struct {
+    struct Mmap {
         int total;
         MmapView chunks;
+
+        explicit Mmap();
+        ~Mmap() = default;
     } m_Mmap;
 
     struct Page {
         uint64_t flushed;
         uint64_t napppend;
-        std::unique_ptr<ska::bytell_hash_map<uint64_t, ByteVecView>> updates;
         PageView temp;
+        std::unique_ptr<ska::bytell_hash_map<uint64_t, ByteVecView>> updates;
 
-        explicit Page(std::unique_ptr<ska::bytell_hash_map<uint64_t, ByteVecView>> updates);
+        explicit Page();
+        ~Page() = default;
     } m_Page;
 
     // Constructor
@@ -37,13 +41,13 @@ struct KV {
     // Copy constructor
     KV(const KV& other) = delete;
     // Destructor
-    ~KV() = default;
+    ~KV();
     // Copy assignment constructor
     KV& operator=(const KV& other) = delete;
     // Move constructor
-    KV(KV&& other) noexcept = default;
+    KV(KV&& other) noexcept = delete;
     // Move assignment
-    KV& operator=(KV&& other) noexcept = default;
+    KV& operator=(KV&& other) noexcept = delete;
 
     void init();
     [[nodiscard]] std::vector<uint8_t> get(ByteVecView key) const;

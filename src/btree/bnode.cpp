@@ -172,7 +172,6 @@ void node_append_kv(BNode& new_, uint16_t idx, uint64_t ptr, ByteVecView key, By
 uint16_t lookup_le_pos(const BNode& node, ByteVecView key) {
     uint16_t n_keys = node.nkeys();
     size_t i = 0;
-    std::cout << n_keys;
     // TODO: Could possible be binary search
     for (; i < n_keys; i++) {
         const ByteVecView this_key = node.get_key(static_cast<uint16_t>(i));

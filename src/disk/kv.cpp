@@ -17,6 +17,7 @@
 #include <cstring>
 #include <iostream>
 #include <limits>
+#include <memory>
 #include <stdexcept>
 #include <vector>
 
@@ -25,8 +26,8 @@
 
 namespace {
 void update_or_revert(KV& db, ByteVecView meta) {
-    if (db.failed) {
-        db.failed = false;
+    if (db.m_Failed) {
+        db.m_Failed = false;
     }
 
     int status = update_file(db);
@@ -35,15 +36,21 @@ void update_or_revert(KV& db, ByteVecView meta) {
         load_meta(db, meta);
         db.m_Page.temp.clear();
         db.m_Page.updates->clear();
-        db.failed = true;
+        db.m_Failed = true;
     }
 }
 }  // namespace
 
 constexpr std::string DB_SIG = "bigchungus";
 
-KV::Page::Page(std::unique_ptr<ska::bytell_hash_map<uint64_t, ByteVecView>> updates)
-    : flushed(0), napppend(0), updates(std::move(updates)) {}
+KV::Page::Page()
+    : flushed(0),
+      napppend(0),
+      updates(std::make_unique<ska::bytell_hash_map<uint64_t, ByteVecView>>()) {
+    temp.reserve(1);
+}
+
+KV::Mmap::Mmap() : total(0) { chunks.reserve(BTREE_PAGE_SIZE); }
 
 // | sig | root_ptr | page_used |
 // | 16B |    8B    |     8B    |
@@ -60,9 +67,7 @@ std::array<uint8_t, 32> save_meta(KV& db) {
 }
 
 void load_meta(KV& db, ByteVecView data) {
-    // Read root pointer from bytes 16-23
     std::memcpy(&db.m_Tree->m_Root, &data[16], sizeof(db.m_Tree->m_Root));
-    // Read flushed page count from bytes 24-31
     std::memcpy(&db.m_Page.flushed, &data[24], sizeof(db.m_Page.flushed));
 }
 
@@ -189,12 +194,11 @@ KV::KV(const std::string& path)
     : m_Path(path),
       m_Tree(std::make_unique<BTree>(0)),
       m_FreeList(std::make_unique<FreeList>()),
-      m_Page{std::make_unique<ska::bytell_hash_map<uint64_t, ByteVecView>>()} {
+      m_Fd(-1),
+      m_Failed(false) {
     std::filesystem::remove(path);
 
-    mode_t mode = 0644;
-    int flags = O_RDWR | O_CREAT;
-    auto fd = open(path.c_str(), flags, mode);
+    auto fd = open(path.c_str(), O_RDWR | O_CREAT, 0644);
     if (fd == -1) {
         throw std::runtime_error("Failed to open database file");
     }
@@ -208,6 +212,17 @@ KV::KV(const std::string& path)
     }
 
     read_root(*this, static_cast<size_t>(st.st_size));
+}
+
+KV::~KV() {
+    if (m_Mmap.chunks.size() > 0) {
+        munmap(m_Mmap.chunks.data(), m_Mmap.total);
+    }
+
+    if (m_Fd != -1) {
+        close(m_Fd);
+        m_Fd = -1;
+    }
 }
 
 void KV::init() {
@@ -247,6 +262,9 @@ ByteVecView KV::page_read(uint64_t ptr) {
 
 ByteVecView KV::page_read_file(uint64_t ptr) {
     uint64_t start = 0;
+    // BUG: m_Mmap.chunks has 0 elements and therefore the for loop doesn't execute
+    // mmap is not placing data correctly into Chunks
+    // temp fix is reserving space in Mmap constructor?
     for (auto chunk : m_Mmap.chunks) {
         uint64_t end =
             start + (static_cast<uint64_t>(chunk.size()) / static_cast<uint64_t>(BTREE_PAGE_SIZE));

@@ -21,16 +21,13 @@ int main() {
         KV db(db_path);
         db.init();
 
-        int x = 2;
-
         std::cout << "Database opened: " << db_path << "\n\n";
 
         std::cout << "Inserting data...\n";
         db.set(str_to_byte_vec("name"), str_to_byte_vec("Alice"));
 
-        // TODO: getting 'bad ptr' when inserting a second key
         db.set(str_to_byte_vec("age"), str_to_byte_vec("25"));
-        // db.set(str_to_byte_vec("city"), str_to_byte_vec("Boston"));
+        db.set(str_to_byte_vec("city"), str_to_byte_vec("Boston"));
         std::cout << "  Inserted 3 key-value pairs\n\n";
 
         exit(0);
