@@ -1,5 +1,7 @@
 #include "btree.h"
 
+#include <sys/_types/_key_t.h>
+
 #include <cstddef>
 #include <cstdint>
 #include <cstring>

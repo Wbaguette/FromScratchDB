@@ -95,7 +95,8 @@ void BNode::set_offset(uint16_t idx, uint16_t offset_val) {
         throw std::out_of_range("offset pos idx cannot be 0");
     }
 
-    size_t offset_pos = 4 + (8 * static_cast<size_t>(nkeys())) + (2 * (static_cast<size_t>(idx) - 1));
+    size_t offset_pos =
+        4 + (8 * static_cast<size_t>(nkeys())) + (2 * (static_cast<size_t>(idx) - 1));
     write_le16(offset_pos, offset_val);
 }
 
@@ -171,6 +172,7 @@ void node_append_kv(BNode& new_, uint16_t idx, uint64_t ptr, ByteVecView key, By
 uint16_t lookup_le_pos(const BNode& node, ByteVecView key) {
     uint16_t n_keys = node.nkeys();
     size_t i = 0;
+    std::cout << n_keys;
     // TODO: Could possible be binary search
     for (; i < n_keys; i++) {
         const ByteVecView this_key = node.get_key(static_cast<uint16_t>(i));
