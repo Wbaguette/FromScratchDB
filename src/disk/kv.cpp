@@ -316,6 +316,7 @@ void KV::set(ByteVecView key, ByteVecView val) {
     update_or_revert(*this, meta);
 }
 
+// TODO: Return true only if the K/V is actually removed 
 bool KV::del(ByteVecView key) {
     if (!get(key).has_value()) {
         return false;
