@@ -5,7 +5,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <optional>
 #include <stdexcept>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -79,7 +81,7 @@ bool BTree::remove(ByteVecView key) {
     return true;
 }
 
-std::vector<uint8_t> BTree::get(ByteVecView key) const {
+std::optional<std::string_view> BTree::get(ByteVecView key) const {
     if (key.size() == 0) {
         return {};
     }
@@ -98,7 +100,8 @@ std::vector<uint8_t> BTree::get(ByteVecView key) const {
         if (node.btype() == BNODE_LEAF) {
             if (lex_cmp_byte_vecs(key, node.get_key(idx)) == 0) {
                 ByteVecView val = node.get_val(idx);
-                return {val.begin(), val.end()};
+                std::string_view val_str(reinterpret_cast<const char*>(val.data()), val.size());
+                return val_str;
             }
             return {};
         }

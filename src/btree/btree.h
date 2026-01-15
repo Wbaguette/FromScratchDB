@@ -1,6 +1,8 @@
 #pragma once
 #include <cstdint>
 #include <functional>
+#include <optional>
+#include <string_view>
 #include <utility>
 
 #include "../shared/views.h"
@@ -30,7 +32,7 @@ struct BTree {
     BTree& operator=(BTree&& other) noexcept = default;
     void insert(ByteVecView key, ByteVecView val);
     bool remove(ByteVecView key);
-    [[nodiscard]] std::vector<uint8_t> get(ByteVecView key) const;
+    [[nodiscard]] std::optional<std::string_view> get(ByteVecView key) const;
 };
 
 BNode tree_insert(BTree& tree, const BNode& node, ByteVecView key, ByteVecView val);

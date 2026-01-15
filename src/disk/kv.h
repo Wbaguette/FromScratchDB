@@ -4,6 +4,8 @@
 
 #include <filesystem>
 #include <memory>
+#include <optional>
+#include <string_view>
 
 #include "../btree/btree.h"
 #include "../freelist/freelist.h"
@@ -50,7 +52,7 @@ struct KV {
     KV& operator=(KV&& other) noexcept = delete;
 
     void init();
-    [[nodiscard]] std::vector<uint8_t> get(ByteVecView key) const;
+    [[nodiscard]] std::optional<std::string_view> get(ByteVecView key) const;
     void set(ByteVecView key, ByteVecView val);
     bool del(ByteVecView key);
 

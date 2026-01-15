@@ -284,7 +284,8 @@ void KV::init() {
     m_FreeList->m_Callbacks.set = [this](uint64_t ptr) { return page_write(ptr); };
 }
 
-std::vector<uint8_t> KV::get(ByteVecView key) const { return m_Tree->get(key); }
+// std::vector<uint8_t> KV::get(ByteVecView key) const { return m_Tree->get(key); }
+std::optional<std::string_view> KV::get(ByteVecView key) const { return m_Tree->get(key); }
 
 void KV::set(ByteVecView key, ByteVecView val) {
     std::array<uint8_t, 32> meta = save_meta(*this);
@@ -294,6 +295,10 @@ void KV::set(ByteVecView key, ByteVecView val) {
 }
 
 bool KV::del(ByteVecView key) {
+    if (!get(key).has_value()) {
+        return true;
+    }
+
     bool deleted = m_Tree->remove(key);
     int status = update_file(*this);
     return deleted;

@@ -25,24 +25,24 @@ int main() {
     db.set(str_to_byte_vec("city"), str_to_byte_vec("Boston"));
 
     // Make sure the data is there
-    auto name = db.get(str_to_byte_vec("name"));
-    auto age = db.get(str_to_byte_vec("age"));
-    auto city = db.get(str_to_byte_vec("city"));
+    auto name = db.get(str_to_byte_vec("name")).value_or("Not found");
+    auto age = db.get(str_to_byte_vec("age")).value_or("Not found");
+    auto city = db.get(str_to_byte_vec("city")).value_or("Not found");
 
-    print_byte_vec_view(name);
-    print_byte_vec_view(age);
-    print_byte_vec_view(city);
+    std::cout << name << "\n";
+    std::cout << age << "\n";
+    std::cout << city << "\n";
 
     // Update some data
     db.set(str_to_byte_vec("age"), str_to_byte_vec("26"));
-    auto updated_age = db.get(str_to_byte_vec("age"));
+    auto updated_age = db.get(str_to_byte_vec("age")).value_or("Not found");
     // Verify updated data
-    print_byte_vec_view(updated_age);
+    std::cout << updated_age << "\n";
 
     // Delete some data
     bool deleted = db.del(str_to_byte_vec("city"));
     // Make sure data got deleted
     std::cout << "Delete " << (deleted ? "successful" : "failed") << "\n";
-    auto check = db.get(str_to_byte_vec("city"));
-    print_byte_vec_view(check);
+    auto check = db.get(str_to_byte_vec("city")).value_or("Not found");
+    std::cout << check << "\n";
 }
