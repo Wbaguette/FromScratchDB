@@ -83,6 +83,16 @@ void read_root(KV& db, size_t file_size) {
 
     ByteVecView data = db.m_Mmap.chunks[0];
     load_meta(db, data);
+
+    // On restore, we must re-initialize the in-memory freelist state.
+    // Page 0 is metadata; page 1 is reserved for freelist.
+    // Without this, deletions will start writing the freelist into page 0, and subsequent
+    // allocations may read bad pointers from metadata (showing up as huge uint64_t ptrs).
+    db.m_FreeList->head_page = 1;
+    db.m_FreeList->tail_page = 1;
+    db.m_FreeList->head_seq = 0;
+    db.m_FreeList->tail_seq = 0;
+    db.m_FreeList->max_seq = 0;
 }
 
 void update_root(KV& db) {
@@ -103,7 +113,19 @@ void write_pages(KV& db) {
         if (page.size() != BTREE_PAGE_SIZE) {
             throw std::runtime_error("update page has bad size");
         }
-        auto offset = static_cast<off_t>(ptr * static_cast<uint64_t>(BTREE_PAGE_SIZE));
+
+        if (ptr == 0) {
+            throw std::runtime_error("attempted to write page 0 (metadata) as a btree page");
+        }
+        constexpr auto page_size = static_cast<uint64_t>(BTREE_PAGE_SIZE);
+        const uint64_t max_ptr =
+            static_cast<uint64_t>(std::numeric_limits<off_t>::max()) / page_size;
+        if (ptr > max_ptr) {
+            throw std::runtime_error("page ptr too large; would overflow file offset");
+        }
+
+        auto offset = static_cast<off_t>(ptr * page_size);
+
         ssize_t written = pwrite(db.m_Fd, page.data(), page.size(), offset);
         if (written == -1) {
             std::cerr << "pwrite failed: offset=" << offset << " errno=" << errno << " ("
@@ -254,6 +276,8 @@ KV::KV(const std::string& path, bool restore_from_file)
 
         extend_mmap(*this, file_size);
     }
+
+    init();
 }
 
 KV::~KV() {
@@ -267,7 +291,6 @@ KV::~KV() {
 
     if (m_Fd != -1) {
         close(m_Fd);
-        std::cout << "Closed database file.";
         m_Fd = -1;
     }
 }
@@ -284,7 +307,6 @@ void KV::init() {
     m_FreeList->m_Callbacks.set = [this](uint64_t ptr) { return page_write(ptr); };
 }
 
-// std::vector<uint8_t> KV::get(ByteVecView key) const { return m_Tree->get(key); }
 std::optional<std::string_view> KV::get(ByteVecView key) const { return m_Tree->get(key); }
 
 void KV::set(ByteVecView key, ByteVecView val) {
@@ -296,11 +318,11 @@ void KV::set(ByteVecView key, ByteVecView val) {
 
 bool KV::del(ByteVecView key) {
     if (!get(key).has_value()) {
-        return true;
+        return false;
     }
 
     bool deleted = m_Tree->remove(key);
-    int status = update_file(*this);
+    update_file(*this);
     return deleted;
 }
 
@@ -357,7 +379,7 @@ uint64_t KV::page_alloc(ByteVecView node_data) {
     return page_append(node_data);
 }
 
-ByteVecView KV::page_write(uint64_t ptr) {
+MutableByteVecView KV::page_write(uint64_t ptr) {
     if (auto found = m_Page.updates->find(ptr); found != m_Page.updates->end()) {
         auto& page = found->second;
         return {page.data(), page.size()};

@@ -1,7 +1,6 @@
 #pragma once
 #include <cstdint>
 #include <functional>
-#include <vector>
 
 #include "../shared/treesizes.h"
 #include "../shared/views.h"
@@ -10,10 +9,12 @@ constexpr int FREE_LIST_HEADER = 8;
 constexpr int FREE_LIST_CAP = (BTREE_PAGE_SIZE - FREE_LIST_HEADER) / 8;
 
 struct LNode {
-    std::vector<uint8_t> m_Data;
+    uint8_t* m_Data;
+    size_t m_Size;
 
     // Constructor
     explicit LNode(ByteVecView data);
+    explicit LNode(MutableByteVecView data);
     // Copy constructor
     LNode(const LNode& other) = delete;
     // Destructor
@@ -24,10 +25,10 @@ struct LNode {
     LNode(LNode&& other) noexcept = default;
     // Move assignment
     LNode& operator=(LNode&& other) noexcept = default;
-    uint64_t get_next();
-    void set_next(uint64_t next);
-    uint64_t get_ptr(size_t idx);
-    void set_ptr(size_t idx, uint64_t ptr);
+    [[nodiscard]] uint64_t get_next() const;
+    void set_next(uint64_t next) const;
+    [[nodiscard]] uint64_t get_ptr(size_t idx) const;
+    void set_ptr(size_t idx, uint64_t ptr) const;
 };
 
 struct FreeList {
@@ -40,7 +41,7 @@ struct FreeList {
     struct Callbacks {
         std::function<ByteVecView(uint64_t)> get;
         std::function<uint64_t(ByteVecView)> alloc;
-        std::function<ByteVecView(uint64_t)> set;
+        std::function<MutableByteVecView(uint64_t)> set;
     };
     Callbacks m_Callbacks;
 

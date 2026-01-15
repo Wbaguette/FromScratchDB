@@ -4,32 +4,42 @@
 #include <cstring>
 #include <vector>
 
-LNode::LNode(ByteVecView data) { m_Data = std::vector<uint8_t>(data.begin(), data.end()); }
+LNode::LNode(ByteVecView data)
+    : m_Data(const_cast<uint8_t*>(data.data())), m_Size(static_cast<size_t>(data.size())) {}
 
-uint64_t LNode::get_next() {
+LNode::LNode(MutableByteVecView data)
+    : m_Data(data.data()), m_Size(static_cast<size_t>(data.size())) {}
+
+uint64_t LNode::get_next() const {
     uint64_t v;
-    std::memcpy(&v, m_Data.data(), sizeof(v));
+    std::memcpy(&v, m_Data, sizeof(v));
     return v;
 }
 
-void LNode::set_next(uint64_t next) { std::memcpy(m_Data.data(), &next, sizeof(next)); }
+void LNode::set_next(uint64_t next) const { std::memcpy(m_Data, &next, sizeof(next)); }
 
-uint64_t LNode::get_ptr(size_t idx) {
+uint64_t LNode::get_ptr(size_t idx) const {
     if (idx >= FREE_LIST_CAP) {
         return 0;
     }
     uint64_t v;
     size_t offset = FREE_LIST_HEADER + (idx * sizeof(uint64_t));
-    std::memcpy(&v, &m_Data[offset], sizeof(v));
+    if (offset + sizeof(uint64_t) > m_Size) {
+        return 0;
+    }
+    std::memcpy(&v, m_Data + offset, sizeof(v));
     return v;
 }
 
-void LNode::set_ptr(size_t idx, uint64_t ptr) {
+void LNode::set_ptr(size_t idx, uint64_t ptr) const {
     if (idx >= FREE_LIST_CAP) {
         return;
     }
     size_t offset = FREE_LIST_HEADER + (idx * sizeof(uint64_t));
-    std::memcpy(&m_Data[offset], &ptr, sizeof(ptr));
+    if (offset + sizeof(uint64_t) > m_Size) {
+        return;
+    }
+    std::memcpy(m_Data + offset, &ptr, sizeof(ptr));
 }
 
 FreeList::FreeList() : head_page(0), head_seq(0), tail_page(0), tail_seq(0), max_seq(0) {}
@@ -69,7 +79,7 @@ std::pair<uint64_t, uint64_t> fl_pop(FreeList& fl) {
         return {0, 0};
     }
 
-    LNode node = LNode(fl.m_Callbacks.get(fl.head_page));
+    auto node = LNode(fl.m_Callbacks.get(fl.head_page));
     uint64_t ptr = node.get_ptr(seq2idx(fl.head_seq));
     fl.head_seq++;
 

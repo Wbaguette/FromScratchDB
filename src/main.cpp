@@ -1,48 +1,30 @@
-#include <fcntl.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <unistd.h>
-
-#include <cstdlib>
-#include <cstring>
-#include <iostream>
+#include <cassert>
 #include <string>
 
-#include "disk/kv.h"
-#include "utils/bytes.h"
+#include "lib/database.h"
 
 int main() {
     const std::string db_path = "test.fsdb";
-
-    KV db(db_path, false);
-    db.init();
-
-    std::cout << "Database opened: " << db_path << "\n\n";
+    auto kv = Database::KVStore(db_path, false);
 
     // Put some data in there
-    db.set(str_to_byte_vec("name"), str_to_byte_vec("Alice"));
-    db.set(str_to_byte_vec("age"), str_to_byte_vec("25"));
-    db.set(str_to_byte_vec("city"), str_to_byte_vec("Boston"));
-
-    // Make sure the data is there
-    auto name = db.get(str_to_byte_vec("name")).value_or("Not found");
-    auto age = db.get(str_to_byte_vec("age")).value_or("Not found");
-    auto city = db.get(str_to_byte_vec("city")).value_or("Not found");
-
-    std::cout << name << "\n";
-    std::cout << age << "\n";
-    std::cout << city << "\n";
+    kv.insert("name", "Romulus");
+    kv.insert("age", "67");
+    kv.insert("city", "Rome");
+    auto name = kv.get("name");
+    auto age = kv.get("age");
+    auto city = kv.get("city");
+    assert(name == "Romulus");
+    assert(age == "67");
+    assert(city == "Rome");
 
     // Update some data
-    db.set(str_to_byte_vec("age"), str_to_byte_vec("26"));
-    auto updated_age = db.get(str_to_byte_vec("age")).value_or("Not found");
-    // Verify updated data
-    std::cout << updated_age << "\n";
+    kv.insert("name", "Remus");
+    auto updated_name = kv.get("name");
+    assert(updated_name == "Remus");
 
     // Delete some data
-    bool deleted = db.del(str_to_byte_vec("city"));
-    // Make sure data got deleted
-    std::cout << "Delete " << (deleted ? "successful" : "failed") << "\n";
-    auto check = db.get(str_to_byte_vec("city")).value_or("Not found");
-    std::cout << check << "\n";
+    bool deleted = kv.remove("city");
+    auto check = kv.get("city");
+    assert(check.empty());
 }

@@ -60,7 +60,7 @@ struct KV {
     ByteVecView page_read(uint64_t ptr);
     uint64_t page_append(ByteVecView node_data);
     uint64_t page_alloc(ByteVecView node_data);
-    ByteVecView page_write(uint64_t ptr);
+    MutableByteVecView page_write(uint64_t ptr);
 };
 
 std::array<uint8_t, 32> save_meta(KV& db);
