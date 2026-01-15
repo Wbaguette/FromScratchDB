@@ -213,33 +213,47 @@ void extend_mmap(KV& db, size_t size) {
     db.m_Mmap.chunks.emplace_back(chunk_data);
 }
 
-KV::KV(const std::string& path)
+KV::KV(const std::string& path, bool restore_from_file)
     : m_Path(path),
       m_Tree(std::make_unique<BTree>(0)),
       m_FreeList(std::make_unique<FreeList>()),
       m_Fd(-1),
       m_Failed(false) {
-    std::filesystem::remove(path);
+    if (restore_from_file) {
+        auto fd = open(path.c_str(), O_RDWR | O_CREAT, 0644);
+        if (fd == -1) {
+            throw std::runtime_error("Failed to open database file");
+        }
+        m_Fd = fd;
 
-    auto fd = open(path.c_str(), O_RDWR | O_CREAT, 0644);
-    if (fd == -1) {
-        throw std::runtime_error("Failed to open database file");
+        struct stat st;
+        fstat(m_Fd, &st);
+        auto file_size = static_cast<size_t>(st.st_size);
+
+        extend_mmap(*this, file_size);
+        read_root(*this, st.st_size);
+    } else {
+        std::filesystem::remove(path);
+
+        auto fd = open(path.c_str(), O_RDWR | O_CREAT, 0644);
+        if (fd == -1) {
+            throw std::runtime_error("Failed to open database file");
+        }
+        m_Fd = fd;
+
+        read_root(*this, 0);
+
+        std::vector<uint8_t> freelist_page(BTREE_PAGE_SIZE, 0);
+        m_Page.temp.emplace_back(std::move(freelist_page));
+
+        update_file(*this);
+
+        struct stat st;
+        fstat(m_Fd, &st);
+        auto file_size = static_cast<size_t>(st.st_size);
+
+        extend_mmap(*this, file_size);
     }
-    m_Fd = fd;
-
-    read_root(*this, 0);
-
-    std::vector<uint8_t> freelist_page(BTREE_PAGE_SIZE, 0);
-    m_Page.temp.emplace_back(std::move(freelist_page));
-
-    update_file(*this);
-
-    struct stat st;
-    fstat(m_Fd, &st);
-
-    auto file_size = static_cast<size_t>(st.st_size);
-
-    extend_mmap(*this, file_size);
 }
 
 KV::~KV() {
@@ -253,6 +267,7 @@ KV::~KV() {
 
     if (m_Fd != -1) {
         close(m_Fd);
+        std::cout << "Closed database file.";
         m_Fd = -1;
     }
 }

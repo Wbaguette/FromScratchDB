@@ -14,7 +14,7 @@
 int main() {
     const std::string db_path = "test.fsdb";
 
-    KV db(db_path);
+    KV db(db_path, false);
     db.init();
 
     std::cout << "Database opened: " << db_path << "\n\n";
@@ -23,10 +23,12 @@ int main() {
     db.set(str_to_byte_vec("name"), str_to_byte_vec("Alice"));
     db.set(str_to_byte_vec("age"), str_to_byte_vec("25"));
     db.set(str_to_byte_vec("city"), str_to_byte_vec("Boston"));
+
     // Make sure the data is there
     auto name = db.get(str_to_byte_vec("name"));
     auto age = db.get(str_to_byte_vec("age"));
     auto city = db.get(str_to_byte_vec("city"));
+
     print_byte_vec_view(name);
     print_byte_vec_view(age);
     print_byte_vec_view(city);
@@ -43,7 +45,4 @@ int main() {
     std::cout << "Delete " << (deleted ? "successful" : "failed") << "\n";
     auto check = db.get(str_to_byte_vec("city"));
     print_byte_vec_view(check);
-
-    // close(db.m_Fd);
-    // std::cout << "\nDatabase closed successfully!\n";
 }

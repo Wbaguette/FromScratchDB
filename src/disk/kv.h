@@ -37,7 +37,7 @@ struct KV {
     } m_Page;
 
     // Constructor
-    explicit KV(const std::string& path);
+    explicit KV(const std::string& path, bool restore_from_file);
     // Copy constructor
     KV(const KV& other) = delete;
     // Destructor
