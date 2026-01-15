@@ -5,8 +5,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <iostream>
-#include <print>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -116,9 +114,6 @@ std::vector<uint8_t> BTree::get(ByteVecView key) const {
 
 BNode tree_insert(BTree& tree, const BNode& node, ByteVecView key, ByteVecView val) {
     BNode new_(static_cast<size_t>(2 * BTREE_PAGE_SIZE));
-
-    // std::println("{}", node.btype());
-    std::cout << node;
 
     uint16_t idx = lookup_le_pos(node, key);
     switch (node.btype()) {

@@ -19,7 +19,7 @@ struct KV {
     bool m_Failed;
 
     struct Mmap {
-        int total;
+        size_t total;
         MmapView chunks;
 
         explicit Mmap();
@@ -29,8 +29,8 @@ struct KV {
     struct Page {
         uint64_t flushed;
         uint64_t napppend;
-        PageView temp;
-        std::unique_ptr<ska::bytell_hash_map<uint64_t, ByteVecView>> updates;
+        std::vector<std::vector<uint8_t>> temp;
+        std::unique_ptr<ska::bytell_hash_map<uint64_t, std::vector<uint8_t>>> updates;
 
         explicit Page();
         ~Page() = default;
@@ -58,7 +58,7 @@ struct KV {
     ByteVecView page_read(uint64_t ptr);
     uint64_t page_append(ByteVecView node_data);
     uint64_t page_alloc(ByteVecView node_data);
-    std::vector<uint8_t> page_write(uint64_t ptr);
+    ByteVecView page_write(uint64_t ptr);
 };
 
 std::array<uint8_t, 32> save_meta(KV& db);

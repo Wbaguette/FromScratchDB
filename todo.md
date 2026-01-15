@@ -1,0 +1,1 @@
+Add persistance option (not deleting the database file before creating it)

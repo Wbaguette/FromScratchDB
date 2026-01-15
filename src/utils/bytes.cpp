@@ -27,6 +27,11 @@ int lex_cmp_byte_vecs(ByteVecView a, ByteVecView b) {
 }
 
 void print_byte_vec_view(ByteVecView a) {
+    if (a.empty()) {
+        std::cout << "empty, data not found\n";
+        return;
+    }
+
     for (const auto c : a) {
         if (c >= 32 && c < 127) {
             std::cout << static_cast<char>(c);

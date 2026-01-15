@@ -22,7 +22,6 @@
 #include <vector>
 
 #include "../shared/treesizes.h"
-#include "../utils/bytes.h"
 
 namespace {
 void update_or_revert(KV& db, ByteVecView meta) {
@@ -46,7 +45,7 @@ constexpr std::string DB_SIG = "bigchungus";
 KV::Page::Page()
     : flushed(0),
       napppend(0),
-      updates(std::make_unique<ska::bytell_hash_map<uint64_t, ByteVecView>>()) {
+      updates(std::make_unique<ska::bytell_hash_map<uint64_t, std::vector<uint8_t>>>()) {
     temp.reserve(1);
 }
 
@@ -73,7 +72,7 @@ void load_meta(KV& db, ByteVecView data) {
 
 void read_root(KV& db, size_t file_size) {
     if (file_size == 0) {
-        db.m_Page.flushed = 2;
+        db.m_Page.flushed = 2;  // Reserve page 0 (metadata) and page 1 (freelist)
         db.m_FreeList->head_page = 1;
         db.m_FreeList->tail_page = 1;
         db.m_FreeList->head_seq = 0;
@@ -84,8 +83,6 @@ void read_root(KV& db, size_t file_size) {
 
     ByteVecView data = db.m_Mmap.chunks[0];
     load_meta(db, data);
-
-    // TODO: Load freelist metadata from page 1 if needed
 }
 
 void update_root(KV& db) {
@@ -102,23 +99,44 @@ void update_root(KV& db) {
 }
 
 void write_pages(KV& db) {
+    for (const auto& [ptr, page] : *db.m_Page.updates) {
+        if (page.size() != BTREE_PAGE_SIZE) {
+            throw std::runtime_error("update page has bad size");
+        }
+        auto offset = static_cast<off_t>(ptr * static_cast<uint64_t>(BTREE_PAGE_SIZE));
+        ssize_t written = pwrite(db.m_Fd, page.data(), page.size(), offset);
+        if (written == -1) {
+            std::cerr << "pwrite failed: offset=" << offset << " errno=" << errno << " ("
+                      << strerror(errno) << ")\n";
+            throw std::runtime_error("failed pwrite");
+        }
+    }
+
     auto size = static_cast<size_t>((db.m_Page.flushed + db.m_Page.temp.size()) * BTREE_PAGE_SIZE);
     extend_mmap(db, size);
 
-    std::vector<iovec> iov(db.m_Page.temp.size());
-    for (size_t i = 0; i < db.m_Page.temp.size(); i++) {
-        iov[i].iov_base = const_cast<uint8_t*>(db.m_Page.temp[i].data());
-        iov[i].iov_len = db.m_Page.temp[i].size();
-    }
+    if (!db.m_Page.temp.empty()) {
+        std::vector<iovec> iov(db.m_Page.temp.size());
+        for (size_t i = 0; i < db.m_Page.temp.size(); i++) {
+            if (db.m_Page.temp[i].size() != BTREE_PAGE_SIZE) {
+                throw std::runtime_error("temp page has bad size");
+            }
+            iov[i].iov_base = db.m_Page.temp[i].data();
+            iov[i].iov_len = db.m_Page.temp[i].size();
+        }
 
-    auto offset = static_cast<off_t>(db.m_Page.flushed * BTREE_PAGE_SIZE);
-    ssize_t written = pwritev(db.m_Fd, iov.data(), static_cast<int>(iov.size()), offset);
-    if (written == -1) {
-        throw std::runtime_error("failed pwritev");
+        auto offset = static_cast<off_t>(db.m_Page.flushed * BTREE_PAGE_SIZE);
+        ssize_t written = pwritev(db.m_Fd, iov.data(), static_cast<int>(iov.size()), offset);
+        if (written == -1) {
+            std::cerr << "pwritev failed: offset=" << offset << " errno=" << errno << " ("
+                      << strerror(errno) << ")\n";
+            throw std::runtime_error("failed pwritev");
+        }
     }
 
     db.m_Page.flushed += static_cast<uint64_t>(db.m_Page.temp.size());
     db.m_Page.temp.clear();
+    db.m_Page.updates->clear();
 }
 
 int update_file(KV& db) {
@@ -143,15 +161,15 @@ int update_file(KV& db) {
 int create_file_sync(const std::filesystem::path& file) {
     mode_t mode = 0644;
 
-    int flags = O_RDONLY | O_DIRECTORY;
-    int dirfd = open(file.c_str(), flags, mode);
+    const auto dir = file.parent_path();
+    const auto name = file.filename();
+
+    int dirfd = open(dir.c_str(), O_RDONLY | O_DIRECTORY);
     if (dirfd == -1) {
-        close(dirfd);
         return -1;
     }
 
-    int flags2 = O_RDWR | O_CREAT;
-    int fd = openat(dirfd, file.c_str(), flags, mode);
+    int fd = openat(dirfd, name.c_str(), O_RDWR | O_CREAT, mode);
     if (fd == -1) {
         close(dirfd);
         return -1;
@@ -172,9 +190,14 @@ void extend_mmap(KV& db, size_t size) {
         return;
     }
 
-    int alloc = std::max(db.m_Mmap.total, 64 << 20);
+    size_t alloc = std::max(db.m_Mmap.total, static_cast<size_t>(1 << 20));
     while (db.m_Mmap.total + alloc < size) {
         alloc *= 2;
+    }
+
+    size_t new_file_size = db.m_Mmap.total + alloc;
+    if (ftruncate(db.m_Fd, static_cast<off_t>(new_file_size)) == -1) {
+        throw std::runtime_error("failed to extend file for mmap");
     }
 
     void* chunk =
@@ -202,22 +225,31 @@ KV::KV(const std::string& path)
     if (fd == -1) {
         throw std::runtime_error("Failed to open database file");
     }
-
     m_Fd = fd;
+
+    read_root(*this, 0);
+
+    std::vector<uint8_t> freelist_page(BTREE_PAGE_SIZE, 0);
+    m_Page.temp.emplace_back(std::move(freelist_page));
+
+    update_file(*this);
 
     struct stat st;
     fstat(m_Fd, &st);
-    if (st.st_size > 0) {
-        extend_mmap(*this, static_cast<size_t>(st.st_size));
-    }
 
-    read_root(*this, static_cast<size_t>(st.st_size));
+    auto file_size = static_cast<size_t>(st.st_size);
+
+    extend_mmap(*this, file_size);
 }
 
 KV::~KV() {
-    if (m_Mmap.chunks.size() > 0) {
-        munmap(m_Mmap.chunks.data(), m_Mmap.total);
+    for (const auto& chunk : m_Mmap.chunks) {
+        if (chunk.data() != nullptr && chunk.size() > 0) {
+            munmap(const_cast<uint8_t*>(chunk.data()), chunk.size());
+        }
     }
+    m_Mmap.chunks.clear();
+    m_Mmap.total = 0;
 
     if (m_Fd != -1) {
         close(m_Fd);
@@ -254,7 +286,8 @@ bool KV::del(ByteVecView key) {
 
 ByteVecView KV::page_read(uint64_t ptr) {
     if (auto found = m_Page.updates->find(ptr); found != m_Page.updates->end()) {
-        return found->second;
+        const auto& page = found->second;
+        return {page.data(), page.size()};
     }
 
     return page_read_file(ptr);
@@ -262,9 +295,6 @@ ByteVecView KV::page_read(uint64_t ptr) {
 
 ByteVecView KV::page_read_file(uint64_t ptr) {
     uint64_t start = 0;
-    // BUG: m_Mmap.chunks has 0 elements and therefore the for loop doesn't execute
-    // mmap is not placing data correctly into Chunks
-    // temp fix is reserving space in Mmap constructor?
     for (auto chunk : m_Mmap.chunks) {
         uint64_t end =
             start + (static_cast<uint64_t>(chunk.size()) / static_cast<uint64_t>(BTREE_PAGE_SIZE));
@@ -287,31 +317,39 @@ ByteVecView KV::page_read_file(uint64_t ptr) {
 
 uint64_t KV::page_append(ByteVecView node_data) {
     uint64_t ptr = m_Page.flushed + static_cast<uint64_t>(m_Page.temp.size());
-    m_Page.temp.emplace_back(node_data);
+
+    std::vector<uint8_t> page(BTREE_PAGE_SIZE);
+    std::memcpy(page.data(), node_data.data(),
+                std::min(node_data.size(), static_cast<size_t>(BTREE_PAGE_SIZE)));
+    m_Page.temp.emplace_back(std::move(page));
     return ptr;
 }
 
 uint64_t KV::page_alloc(ByteVecView node_data) {
     if (uint64_t ptr = m_FreeList->pop_head(); ptr != 0) {
-        m_Page.updates->emplace(ptr, node_data);
+        std::vector<uint8_t> page(BTREE_PAGE_SIZE);
+        std::memcpy(page.data(), node_data.data(),
+                    std::min(node_data.size(), static_cast<size_t>(BTREE_PAGE_SIZE)));
+        m_Page.updates->emplace(ptr, std::move(page));
         return ptr;
     }
 
     return page_append(node_data);
 }
 
-std::vector<uint8_t> KV::page_write(uint64_t ptr) {
+ByteVecView KV::page_write(uint64_t ptr) {
     if (auto found = m_Page.updates->find(ptr); found != m_Page.updates->end()) {
-        ByteVecView val = found->second;
-        return {val.begin(), val.end()};
+        auto& page = found->second;
+        return {page.data(), page.size()};
     }
 
-    std::vector<uint8_t> node(BTREE_PAGE_SIZE);
-
+    std::vector<uint8_t> page(BTREE_PAGE_SIZE);
     ByteVecView data = page_read_file(ptr);
-    std::memcpy(node.data(), data.data(),
+    std::memcpy(page.data(), data.data(),
                 std::min(data.size(), static_cast<size_t>(BTREE_PAGE_SIZE)));
-    m_Page.updates->emplace(ptr, node);
 
-    return node;
+    auto [it, inserted] = m_Page.updates->emplace(ptr, std::move(page));
+    (void)inserted;
+    auto& stored = it->second;
+    return {stored.data(), stored.size()};
 }
