@@ -5,6 +5,4 @@ int main() {
 
     basic_crud(db_path);
     restored_crud(db_path);
-
-    bulk_crud(db_path);
 }
